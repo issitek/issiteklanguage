@@ -50,6 +50,13 @@ services:
               count: 1
               capabilities: [gpu]
 
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: talkdrill-lab-tts
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9082:8880"
+
   lab-server:
     build:
       context: .
@@ -59,9 +66,19 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${LAB_SERVER_HOST_PORT:-9090}:9090"
+    depends_on:
+      - llm
+      - tts
     environment:
       LAB_TOKEN: ${LAB_TOKEN}
+      LAB_MODE: ${LAB_MODE:-conversation}
+      LLM_URL: http://llm:8080
+      TTS_URL: http://tts:8880
+      HF_HOME: /models_whisper
       TURN_SHARED_SECRET: ${TURN_SHARED_SECRET}
       TURN_REALM: ${TURN_REALM}
       TURN_MIN_PORT: ${TURN_MIN_PORT:-49152}
       TURN_MAX_PORT: ${TURN_MAX_PORT:-49200}
+    volumes:
+      - ./data:/data:ro
+      - ./models:/models_whisper

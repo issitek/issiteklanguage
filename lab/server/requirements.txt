@@ -2,3 +2,7 @@ fastapi>=0.115
 uvicorn[standard]>=0.32
 aiortc>=1.9,<2
 numpy>=2
+faster-whisper==1.2.0
+av>=13,<14
+aiohttp>=3.9
+requests>=2.31

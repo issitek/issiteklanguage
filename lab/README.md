@@ -12,7 +12,7 @@ propios (`talkdrill-lab-*`), puertos locales documentados abajo.
 | 3478, 49152–49200 | coturn laboratorio (STUN/TURN REST-only) | ✅ configurado |
 | 9080 | llama-server (Qwen3.5-4B Q4_K_M, P100) | ✅ configurado |
 | 9081 | STT bench (own container `talkdrill-lab-stt`, no port published) | en uso |
-| 9082 | Kokoro TTS bench EN (`remsky/kokoro-fastapi-cpu`) | en uso |
+| 9082 | Kokoro TTS EN (`talkdrill-lab-tts`, servicio compose) | en uso |
 | 9090 | lab-server (aiortc: echo + DataChannel + TURN creds) | ✅ configurado |
 | 5060/8080/7000/… | **NO usar** (ocupados por proyectos existentes) | — |
 

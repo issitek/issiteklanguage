@@ -1,16 +1,18 @@
-"""Servidor de laboratorio talkdrill (Fase 0).
+"""Servidor de laboratorio talkdrill (Fase 0) — modo conversación.
 
-Propósito: demostrar la conexión WebRTC bidireccional navegador ↔ aiortc:
-- POST /offer                : el cliente manda su SDP offer; devolvemos SDP answer
-- Audio RTP                  : el audio del alumno vuelve (echo) por el mismo PC
-- DataChannel "events"       : recibimos mensajes del cliente y enviamos eventos
-                               pedagógicos de prueba (assistant_response con visemas)
-- POST /ice-credentials      : cuaja iceServers con HMAC de vida corta (patrón mxerp)
-- POST /webrtc/ice-report    : anillo en memoria de telemetría de conexión (max 50)
+Dos modos (env LAB_MODE):
+- conversation (default): mic → VAD → faster-whisper → LLM local (llama.cpp)
+  → Kokoro TTS → RTP de regreso + visemes + barge-in (TD-F0-005/011/013)
+- echo: el audio del alumno vuelve (regresión TD-F0-003/004)
+
+Endpoints:
+- POST /offer              : negociación WebRTC (offer del cliente → answer)
+- POST /ice-credentials    : iceServers TURN REST/HMAC de vida corta
+- POST /webrtc/ice-report  : anillo de telemetría (max 50)
 - GET  /webrtc/ice-report/recent
-- GET  /                     : página de prueba (lab/client)
+- GET  /                   : página de prueba (lab/client)
 
-NO ES EL PRODUCTO: no hace STT/LLM/TTS todavía. Es el andamiaje go/no-go.
+NO ES EL PRODUCTO: es el andamiaje go/no-go de la Fase 0.
 """
 
 import asyncio
@@ -19,23 +21,37 @@ import logging
 import os
 import time
 from collections import deque
+from fractions import Fraction
 from pathlib import Path
 
+import av
+import numpy as np
 from aiortc import RTCPeerConnection, MediaStreamTrack
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from conversation import (
+    EnergyVAD,
+    SpeakerTrack,
+    _load_whisper,
+    _stt_sync,
+    call_llm,
+    synth_tts,
+    text_visemes,
+    wav_to_rtp_frames,
+)
 from ice import ice_servers
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("lab-server")
 
 LAB_TOKEN = os.environ.get("LAB_TOKEN", "dev-token")
+LAB_MODE = os.environ.get("LAB_MODE", "conversation")
 CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
-app = FastAPI(title="talkdrill lab (Fase 0)")
+app = FastAPI(title="talkdrill lab (Fase 0)", version="0.2.0")
 
 ice_reports: deque = deque(maxlen=50)
 peer_connections: set[RTCPeerConnection] = set()
@@ -48,7 +64,7 @@ def check_token(x_lab_token: str | None):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "peer_connections": len(peer_connections)}
+    return {"status": "ok", "mode": LAB_MODE, "peer_connections": len(peer_connections)}
 
 
 @app.post("/ice-credentials")
@@ -78,7 +94,7 @@ class Offer(BaseModel):
 
 
 class EchoAudioTrack(MediaStreamTrack):
-    """Reenvía los frames de audio del alumno de vuelta (echo de laboratorio)."""
+    """Modo echo: reenvía el audio del alumno (regresión)."""
 
     kind = "audio"
 
@@ -91,7 +107,6 @@ class EchoAudioTrack(MediaStreamTrack):
 
 
 def sample_assistant_response() -> dict:
-    """Evento pedagógico de prueba con timeline de visemas (esquema RN-001)."""
     return {
         "type": "assistant_response",
         "v": 1,
@@ -118,6 +133,120 @@ def sample_assistant_response() -> dict:
     }
 
 
+class PeerSession:
+    """Estado de una conexión: speaker track, VAD, historial, canal de eventos."""
+
+    def __init__(self):
+        self.speaker = SpeakerTrack()
+        self.vad = EnergyVAD()
+        self.dc: object | None = None
+        self.history: list[dict] = []
+        self._acc = np.array([], dtype=np.int16)
+        self._speech: list[np.ndarray] = []
+        self.tts_active = False
+        self.audio_seq = 0
+        self._end_speaking_task: asyncio.Task | None = None
+
+    async def send_event(self, payload: dict):
+        payload.setdefault("v", 1)
+        payload.setdefault(
+            "ts", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        )
+        dc = self.dc
+        if dc is not None and getattr(dc, "readyState", None) == "open":
+            dc.send(json.dumps(payload, ensure_ascii=False))
+
+    async def on_window(self, window: np.ndarray):
+        event = self.vad.feed(window)
+        if self.vad.in_speech or event == "speech_start":
+            self._speech.append(window)
+        if event == "speech_end":
+            pcm = np.concatenate(self._speech).tobytes() if self._speech else b""
+            self._speech = []
+            if self.tts_active:
+                await self._barge_in()
+                return
+            if len(pcm) >= 16000:  # >0.5 s de audio (16-bit mono @16 kHz)
+                asyncio.create_task(self.respond(pcm))
+
+    async def consume_remote(self, track):
+        resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+        try:
+            while True:
+                frame = await track.recv()
+                for out in resampler.resample(frame) or []:
+                    arr = out.to_ndarray().reshape(-1).astype(np.int16)
+                    self._acc = np.concatenate([self._acc, arr])
+                    while len(self._acc) >= 320:  # 20 ms @16 kHz
+                        window, self._acc = self._acc[:320], self._acc[320:]
+                        await self.on_window(window)
+        except Exception as exc:  # track termina o error
+            log.info("track remoto terminado: %s", exc)
+
+    async def _barge_in(self):
+        t0 = time.perf_counter()
+        cleared = self.speaker.clear()
+        if self._end_speaking_task:
+            self._end_speaking_task.cancel()
+        self.tts_active = False
+        await self.send_event({"type": "interrupt", "v": 1, "frames_dropped": cleared})
+        await self.send_event({"type": "listening_state", "state": "listening"})
+        log.info("barge-in: %d frames descartados en %.0f ms", cleared, (time.perf_counter() - t0) * 1000)
+
+    async def respond(self, pcm: bytes):
+        loop = asyncio.get_running_loop()
+        t0 = time.perf_counter()
+        student_text, stt_dt = await loop.run_in_executor(None, _stt_sync, pcm)
+        stt_ms = int(stt_dt * 1000)
+        if len(student_text.strip()) < 2:
+            log.info("STT vacío, se ignora el turno")
+            await self.send_event({"type": "listening_state", "state": "listening"})
+            return
+        log.info("STT (%d ms): %s", stt_ms, student_text)
+        self.history.append({"role": "user", "content": student_text})
+
+        await self.send_event({"type": "listening_state", "state": "thinking"})
+        answer, llm_dt = await call_llm(self.history, student_text)
+        reply = answer["reply_text"]
+        correction = answer.get("correction")
+        emotion = answer.get("emotion", "neutral")
+        llm_ms = int(llm_dt * 1000)
+        self.history.append({"role": "assistant", "content": reply})
+
+        wav_bytes, tts_dt = await synth_tts(reply)
+        tts_ms = int(tts_dt * 1000)
+        frames, duration_ms = wav_to_rtp_frames(wav_bytes)
+        for f in frames:
+            self.speaker.put(f)
+        self.tts_active = True
+        self.audio_seq += 1
+
+        await self.send_event({
+            "type": "assistant_response",
+            "session_id": "lab-session",
+            "text": reply,
+            "correction": correction,
+            "emotion": emotion,
+            "visemes": text_visemes(reply, duration_ms),
+            "audio_seq": self.audio_seq,
+            "model": "qwen3.5-4b-local",
+            "metrics": {"stt_ms": stt_ms, "llm_ms": llm_ms, "tts_ms": tts_ms,
+                        "utt_ms": int((time.perf_counter() - t0) * 1000)},
+        })
+        await self.send_event({"type": "listening_state", "state": "speaking"})
+        log.info("turno (%d ms) stt=%d llm=%d tts=%d reply=%d chars",
+                 int((time.perf_counter() - t0) * 1000), stt_ms, llm_ms, tts_ms, len(reply))
+
+        async def _end_speaking():
+            await asyncio.sleep(duration_ms / 1000 + 0.4)
+            self.tts_active = False
+            await self.send_event({"type": "listening_state", "state": "listening"})
+
+        if self._end_speaking_task:
+            self._end_speaking_task.cancel()
+        self._end_speaking_task = asyncio.create_task(_end_speaking())
+
+
 @app.post("/offer")
 async def post_offer(body: Offer, x_lab_token: str | None = Header(default=None)):
     check_token(x_lab_token)
@@ -125,6 +254,7 @@ async def post_offer(body: Offer, x_lab_token: str | None = Header(default=None)
 
     pc = RTCPeerConnection()
     peer_connections.add(pc)
+    session = PeerSession()
 
     @pc.on("connectionstatechange")
     async def on_state_change():
@@ -133,16 +263,23 @@ async def post_offer(body: Offer, x_lab_token: str | None = Header(default=None)
             peer_connections.discard(pc)
             await pc.close()
 
-    @pc.on("track")
-    def on_track(track):
-        log.info("track remoto recibido: kind=%s", track.kind)
-        if track.kind == "audio":
-            pc.addTrack(EchoAudioTrack(track))
-            log.info("echo track añadida")
+    if LAB_MODE == "echo":
+        @pc.on("track")
+        def on_track(track):
+            if track.kind == "audio":
+                pc.addTrack(EchoAudioTrack(track))
+    else:
+        pc.addTrack(session.speaker)
+
+        @pc.on("track")
+        def on_track(track):
+            if track.kind == "audio":
+                asyncio.create_task(session.consume_remote(track))
 
     @pc.on("datachannel")
     def on_datachannel(channel):
         log.info("datachannel abierto: %s", channel.label)
+        session.dc = channel
 
         @channel.on("message")
         def on_message(message):
@@ -153,9 +290,9 @@ async def post_offer(body: Offer, x_lab_token: str | None = Header(default=None)
                 data = {"raw": str(message)}
             channel.send(json.dumps({"type": "echo", "received": data}))
 
-        # Eventos pedagógicos de prueba al abrir el canal
-        channel.send(json.dumps({"type": "listening_state", "v": 1, "state": "listening"}))
-        channel.send(json.dumps(sample_assistant_response()))
+        asyncio.create_task(session.send_event({"type": "listening_state", "state": "listening"}))
+        if LAB_MODE == "echo":
+            channel.send(json.dumps(sample_assistant_response()))
 
     offer = RTCSessionDescription(sdp=body.sdp, type=body.type)
     await pc.setRemoteDescription(offer)
@@ -164,6 +301,13 @@ async def post_offer(body: Offer, x_lab_token: str | None = Header(default=None)
     return JSONResponse(
         {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
     )
+
+
+@app.on_event("startup")
+async def on_startup():
+    if LAB_MODE == "conversation":
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _load_whisper)
 
 
 @app.on_event("shutdown")

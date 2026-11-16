@@ -39,9 +39,10 @@ Qwen/LFM existentes. Secreto TURN propio (`talkdrill-lab`) vía `.env.lab` (no v
 | Modelo | LLM Qwen3.5-4B — calidad pedagógica (set prompts §fase0) | 🟡 bench TTFT/tok/s ejecutado (PASS); set 30 prompts pendiente | `lab/bench_llm.py`, §3.2 |
 | Red | coturn lab Allocate + relay HMAC (automatizado) | ✅ PASS (2026-11-16) | §3.1 |
 | E2E | aiortc echo + DataChannel (automatizado) | ✅ PASS (2026-11-16) | §3.3 |
+| E2E | Conversación completa aiortc (WAV Kokoro como mic) | ✅ PASS (2026-11-16) · STT CPU 4.6 s | §3.5 |
 | Modelo | TTS EN Kokoro 82M | ✅ PASS (0.56 s/utterance CPU) | §3.4 |
 | Modelo | TTS ES (Kokoro ES o Qwen3-TTS 0.6B) | ⬜ pendiente (TD-F0-010) | |
-| E2E | Loop WebRTC→STT→LLM→TTS→RTP→visemes (Chrome escritorio) | ⬜ pendiente (TD-F0-011…012) | |
+| E2E | Loop WebRTC→STT→LLM→TTS→RTP→visemes (automatizado) | ✅ PASS (2026-11-16) · Chrome manual pendiente | §3.5 |
 | E2E | Sesión estable ≥ 15 min | ⬜ pendiente | |
 | Negocio | Costo por minuto local vs externo | ⬜ pendiente (TD-F0-018) | |
 
@@ -87,6 +88,33 @@ GPU LLM (lab): ~3.3 GB VRAM (Q4_K_M). Con VAD+Whisper+TTS caben en los 16 GB de 
 - WebRTC navegador ↔ aiortc ↔ navegador vía el mismo PC (echo): audio de vuelta recibido en ~1 s.
 - DataChannel `events` entrega `listening_state` y `assistant_response` (visemas incluidos) → página `http://127.0.0.1:9090/` lista para TD-F0-004 manual (Chrome escritorio) y para el guion de Fase 0 en Android/iPhone.
 - Pendiente en este entorno: prueba manual Chrome, Android real, iPhone real, relay forzado, reconexión, barge-in real, loop E2E con STT/TTS real, evaluación del set de 30 prompts.
+
+### 3.5 Loop conversacional E2E (TD-F0-011/012) — ✅ PASS automatizado (2026-11-16 UTC)
+
+`python /app/tests/test_conversation_e2e.py` (cliente aiortc envía `s02.wav` Kokoro
+"Yesterday I went to school." como micrófono; el servidor responde por RTP):
+
+```
+connectionState: connected
+assistant_text: "¡Muy bien! Tu frase es correcta y natural. ¡Buen trabajo!"
+correction: null           ← correcto: la frase no tenía error (esquema §8.3 normalizado)
+emotion: encouraging
+visemes: 45 (heurística texto→visema; el TTS remsky no expone pistas fonéticas)
+metrics: stt_ms 4584 · llm_ms ~900-1700 · tts_ms ~900-1050 · turno total ~6.4 s
+pass: true · audio del profesor: ~450 frames Opus
+```
+
+**Latencia primer-voz (medido):** STT CPU int8 **≈4.6 s** domina el turno (Beam 5, ~4 s de
+utterance con pre/post silencio). LLM ~1-1.7 s (enable_thinking=false). TTS ~1 s.
+La meta < 2.5 s de inicio de voz **no se cumple en este host por el STT en CPU**
+(faster-whisper CT2/CUDA 12 no soporta Pascal sm_60). Requiere GPU sm_70+ o STT
+externo; ver riesgo R11 (maestro §15). El resto del pipeline (LLM+TTS+eventos) va holgado.
+
+Notas:
+- Modo `echo` preservado para regresión (`LAB_MODE=echo`); verificado también hoy.
+- Barge-in implementado en servidor (VAD + cancelación de SpeakerTrack + evento `interrupt`)
+  pero **pendiente de prueba humana con audífonos** (TD-F0-013) — no medible sin altavoces.
+- La corrección con `original == corrected` se normaliza a `null` en el servidor.
 
 ### 3.4 STT / TTS — ✅ PASS en EN (2026-11-16 UTC)
 
