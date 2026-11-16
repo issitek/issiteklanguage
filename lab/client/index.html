@@ -38,6 +38,7 @@
   .chip { display:inline-block; border-radius:999px; padding:.1rem .5rem; font-size:.68rem;
           background:#33415e; color:#cdd6f4; margin-left:.4rem; vertical-align:middle; }
   .meta { font-size:.66rem; color:#8b96b8; margin-top:.25rem; }
+  .translation { font-size:.82rem; color:#aeb9e0; font-style:italic; margin-top:.15rem; }
 </style>
 </head>
 <body>
@@ -162,6 +163,7 @@ function handleEvent(msg) {
   }
   if (data.type === 'assistant_response') {
     let inner = escapeHtml(data.text);
+    if (data.translation_es) inner += `<div class="translation">${escapeHtml(data.translation_es)}</div>`;
     if (data.correction) {
       inner += `<div class="correction"><span class="bad">${escapeHtml(data.correction.original)}</span><br>`
              + `<span class="ok">✓ ${escapeHtml(data.correction.corrected)}</span>`

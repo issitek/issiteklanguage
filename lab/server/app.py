@@ -166,7 +166,7 @@ class PeerSession:
             if self.tts_active:
                 await self._barge_in()
                 return
-            if len(pcm) >= 16000:  # >0.5 s de audio (16-bit mono @16 kHz)
+            if len(pcm) >= 25600:  # >0.8 s de audio (16-bit mono @16 kHz)
                 asyncio.create_task(self.respond(pcm))
 
     async def consume_remote(self, track):
@@ -211,6 +211,7 @@ class PeerSession:
         answer, llm_dt = await call_llm(self.history, student_text)
         reply = answer["reply_text"]
         correction = answer.get("correction")
+        translation_es = answer.get("translation_es", "")
         emotion = answer.get("emotion", "neutral")
         llm_ms = int(llm_dt * 1000)
         self.history.append({"role": "assistant", "content": reply})
@@ -227,6 +228,7 @@ class PeerSession:
             "type": "assistant_response",
             "session_id": "lab-session",
             "text": reply,
+            "translation_es": translation_es,
             "correction": correction,
             "emotion": emotion,
             "visemes": text_visemes(reply, duration_ms),

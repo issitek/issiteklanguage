@@ -33,9 +33,13 @@ SAMPLERATE_RTP = 48000
 FRAME_SAMPLES_RTP = SAMPLERATE_RTP // 50  # 20 ms
 
 SYSTEM_PROMPT = (
-    "Eres 'Alex', profesor de inglés para mexicanos. Nivel A2. Corriges con amabilidad. "
-    "Responde SOLO un JSON válido con estas claves: "
-    '{"reply_text": string, "correction": {"original": string, "corrected": string, '
+    "Eres 'Alex', profesor de inglés para mexicanos. Nivel A2 (el alumno ya entendió frases "
+    "sencillas). Habla en INGLÉS (frases cortas y sencillas); usa español mexicano solo para "
+    "aclarar algo esencial, una frase como mucho. Prioriza que el alumno hable inglés. "
+    "Corriges con amabilidad. Responde SOLO un JSON válido con estas claves: "
+    '{"reply_text": string (tu respuesta en INGLÉS), '
+    '"translation_es": string (traducción al español de reply_text), '
+    '"correction": {"original": string, "corrected": string, '
     '"reason": string} | null, "emotion": "neutral|encouraging|surprised|confused|approving|playful"}. '
     "Sin texto adicional fuera del JSON."
 )
@@ -144,8 +148,8 @@ class SpeakerTrack(MediaStreamTrack):
 class EnergyVAD:
     """VAD por energía con hangover (sin dependencias externas)."""
 
-    def __init__(self, sample_rate=SAMPLERATE_IN, frame_ms=20, threshold=450,
-                 speech_start_windows=3, silence_end_windows=30):
+    def __init__(self, sample_rate=SAMPLERATE_IN, frame_ms=20, threshold=750,
+                 speech_start_windows=3, silence_end_windows=25):
         self.threshold = threshold
         self.speech_start = speech_start_windows
         self.silence_end = silence_end_windows
@@ -200,7 +204,12 @@ def _stt_sync(pcm_bytes: bytes) -> tuple[str, float]:
     audio = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
     t0 = time.perf_counter()
     segments, _info = _whisper_model.transcribe(audio, language=None, beam_size=2, vad_filter=False)
-    text = " ".join(seg.text.strip() for seg in segments).strip()
+    segs = list(segments)
+    # Descartar ruido: si ninguna hipótesis supera el suelo de confianza, es silencio/ruido de sala
+    best_logprob = max((getattr(s, "avg_logprob", -10.0) for s in segs), default=-10.0)
+    if not segs or best_logprob < -1.1:
+        return "", time.perf_counter() - t0
+    text = " ".join(s.text.strip() for s in segs).strip()
     return text, time.perf_counter() - t0
 
 
@@ -281,6 +290,8 @@ async def call_llm(history: list[dict], student_text: str) -> tuple[dict, float]
             parsed["correction"] = None  # la frase ya era correcta: no hay corrección
     elif not (isinstance(correction, dict) and correction.get("corrected")):
         parsed["correction"] = None
+    if not isinstance(parsed.get("translation_es"), str):
+        parsed["translation_es"] = ""
     return parsed, dt
 
 
