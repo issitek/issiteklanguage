@@ -40,7 +40,7 @@ Qwen/LFM existentes. Secreto TURN propio (`talkdrill-lab`) vía `.env.lab` (no v
 | Red | coturn lab Allocate + relay HMAC (automatizado) | ✅ PASS (2026-11-16) | §3.1 |
 | E2E | aiortc echo + DataChannel (automatizado) | ✅ PASS (2026-11-16) | §3.3 |
 | E2E | Conversación completa aiortc (WAV Kokoro como mic) | ✅ PASS (2026-11-16) · STT CPU 4.6 s | §3.5 |
-| Pronunciación | PoC OpenPronounce (humo Kokoro CPU) | ✅ PASS humo (98.39/100.0) · es-MX pendiente: dataset + calibración | §3.6 |
+| Pronunciación | PoC OpenPronounce (humo + bench + proxy ES) | ✅ offline CPU · Kokoro 96.59 nativo · proxy ES ~21–24 (sin calibrar castiga a es-MX) · es-MX humano pendiente | §3.6 |
 | Modelo | TTS EN Kokoro 82M | ✅ PASS (0.56 s/utterance CPU) | §3.4 |
 | Modelo | TTS ES (Kokoro ES o Qwen3-TTS 0.6B) | ⬜ pendiente (TD-F0-010) | |
 | E2E | Loop WebRTC→STT→LLM→TTS→RTP→visemes (automatizado) | ✅ PASS (2026-11-16) · Chrome manual pendiente | §3.5 |
