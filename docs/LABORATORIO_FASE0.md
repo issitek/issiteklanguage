@@ -40,6 +40,7 @@ Qwen/LFM existentes. Secreto TURN propio (`talkdrill-lab`) vía `.env.lab` (no v
 | Red | coturn lab Allocate + relay HMAC (automatizado) | ✅ PASS (2026-11-16) | §3.1 |
 | E2E | aiortc echo + DataChannel (automatizado) | ✅ PASS (2026-11-16) | §3.3 |
 | E2E | Conversación completa aiortc (WAV Kokoro como mic) | ✅ PASS (2026-11-16) · STT CPU 4.6 s | §3.5 |
+| Pronunciación | PoC OpenPronounce (humo Kokoro CPU) | ✅ PASS humo (98.39/100.0) · es-MX pendiente: dataset + calibración | §3.6 |
 | Modelo | TTS EN Kokoro 82M | ✅ PASS (0.56 s/utterance CPU) | §3.4 |
 | Modelo | TTS ES (Kokoro ES o Qwen3-TTS 0.6B) | ⬜ pendiente (TD-F0-010) | |
 | E2E | Loop WebRTC→STT→LLM→TTS→RTP→visemes (automatizado) | ✅ PASS (2026-11-16) · Chrome manual pendiente | §3.5 |
@@ -115,6 +116,21 @@ Notas:
 - Barge-in implementado en servidor (VAD + cancelación de SpeakerTrack + evento `interrupt`)
   pero **pendiente de prueba humana con audífonos** (TD-F0-013) — no medible sin altavoces.
 - La corrección con `original == corrected` se normaliza a `null` en el servidor.
+
+### 3.6 Fase 0b — PoC OpenPronounce (humo Kokoro) — ✅ PASS técnico (2026-11-16 UTC)
+
+Dato crítico para el go/no-go: el humo con Kokoro **solo** valida integración técnica;
+la evidencia de es-MX vendrá de las etiquetas humanas (P1–P4, pendiente).
+
+- Contenedor `talkdrill-lab-pronunciation` (CPU, aislado de la P100 y de Qwen/LFM; openpronounce MIT; torch CPU; `OPENPRONOUNCE_TTS=kokoro` voz af_heart). Primero run ~2.4 GB de checkpoints Wav2Vec2 + `spacy download en_core_web_sm` horneado en la imagen (sin red en runtime).
+- Humo (frases exactas, WAV Kokoro): `smoke-think.wav` "I think this is the right thing." → **score 98.39**, PER 0.0, 0 errores; `smoke-howareyou.wav` → **score 100.0**. Las rutas de error están implementadas (arrays `errors[]` con IPA esperada/detectada + confianza) pero no se ejercen hasta P2/P3.
+- Latencia CLI ~28 s por utterance en frío (CPU); el bench se medirá en caliente/servidor (P2).
+- Datos: `lab/data/pronunciation/` (audio/consent/labels/manifest) **excluidos de git** (`lab/data/` en `.gitignore`); consentimiento obligatorio con plantilla `docs/fase0/consentimiento-plantilla.md`.
+- Guion de 30 frases orientadas /θ ð ɪ iː ɹ ʃ tʃ/: `docs/fase0/guion-pronunciacion.md`. Plantillas: `labels-template.csv`. Consentimiento: `consentimiento-plantilla.md`.
+
+**Aguarda:** recolección + etiquetado es-MX (2 jueces) → bench → calibración → informe
+`docs/fase0/poc-pronunciacion.md` con decisión adoptar/modificar/descartar. El go/no-go
+de Fase 0 queda condicionado a este análisis (precision/recall por palabra + falsos positivos).
 
 ### 3.4 STT / TTS — ✅ PASS en EN (2026-11-16 UTC)
 

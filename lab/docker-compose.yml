@@ -57,6 +57,20 @@ services:
     ports:
       - "127.0.0.1:9082:8880"
 
+  pronunciation:
+    build: ./pronunciation
+    image: talkdrill-lab-pronunciation:dev
+    container_name: talkdrill-lab-pronunciation
+    profiles: ["poc"]
+    volumes:
+      - pronunciation-models:/models
+      - ./data/pronunciation:/data
+    environment:
+      HF_HOME: /models
+      OPENPRONOUNCE_TTS: kokoro
+      OPENPRONOUNCE_TTS_VOICE: af_heart
+      OPENPRONOUNCE_DEVICE: cpu
+
   lab-server:
     build:
       context: .
@@ -82,3 +96,6 @@ services:
     volumes:
       - ./data:/data:ro
       - ./models:/models_whisper
+
+volumes:
+  pronunciation-models:

@@ -82,3 +82,17 @@ docker run --rm -v /home/dev/share/VozNativa/scratch:/es:ro talkdrill-lab-stt --
 - `.env.lab` nunca se commitea (está en `.gitignore`).
 - `coturn` usa secreto propio (`talkdrill-lab`), distinto al de cualquier otro proyecto.
 - El relay de STUN/TURN se prueba solo en red propia/laboratorio.
+
+## Fase 0b — PoC OpenPronounce (pronunciación)
+
+```bash
+# Construir la imagen aislada (CPU, nada toca la P100 ni Qwen/LFM)
+cd /home/dev/share/issitekLanguage/lab
+docker compose --env-file .env.lab --profile poc build pronunciation
+# Humo (Kokoro af_heart como referencia; es humo técnico, no evidencia es-MX)
+docker compose --env-file .env.lab --profile poc run --rm pronunciation \
+  smoke/smoke-think.wav "I think this is the right thing." --json --no-prosody
+```
+Guion y consentimiento para grabarse con voluntarios:
+`docs/fase0/guion-pronunciacion.md` · audios en `lab/data/pronunciation/` (fuera de git).
+Calibrado es-MX (P3) y decisión (P4): faltan las grabaciones.

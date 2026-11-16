@@ -1,0 +1,4 @@
+speaker_id,file,sentence_id,word,phoneme,verdict,notes
+s01,s01-03.wav,03,think,θ,mal,sustituye θ por /t/ ("tink")
+s01,s01-03.wav,03,this,ð,mejorable,ð débil
+s02,s02-06.wav,06,third,θ,ok,
