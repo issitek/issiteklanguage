@@ -1,0 +1,7 @@
+# Override LAN para pruebas en dispositivos (TEMPORAL)
+# Uso: docker compose --env-file .env.lab -f docker-compose.yml -f docker-compose.lan.yml up -d lab-server
+# Revertir al terminar: volver a levantar sin este fichero (127.0.0.1).
+services:
+  lab-server:
+    ports:
+      - "0.0.0.0:9090:9090"
