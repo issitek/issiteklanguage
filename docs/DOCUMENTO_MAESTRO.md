@@ -169,7 +169,7 @@ tarea y modelo.
 
 | Función | Primera opción | Alternativa |
 |---|---|---|
-| Cerebro conversacional | Qwen3.5 4B cuantizado (P100, llama.cpp, API compatible OpenAI) | API externa |
+| Cerebro conversacional | Qwen3.5 4B cuantizado (P100, llama.cpp, API compatible OpenAI) — **thinking desactivado en conversación** | API externa |
 | Conversación avanzada | API externa | Qwen local |
 | Reconocimiento de voz | faster-whisper / whisper.cpp base-small | API STT externa |
 | Voz inglesa | Kokoro 82M | Qwen3-TTS 0.6B |
@@ -713,6 +713,11 @@ services:
 }
 ```
 
+El router **normaliza** esta salida antes de emitirla por DataChannel (hallazgo
+2026-11-16): valores fuera de enum (p. ej. `encouraged`) se mapean al sinónimo
+permitido más cercano o a `neutral`; JSON inválido → 1 reintento → fallback o
+error pedagógico. Nunca se reenvía al avatar un valor no validado.
+
 ### 8.4 Laboratorio P100 (medición)
 
 Procedimiento y resultados en `docs/LABORATORIO_FASE0.md`. Métricas mínimas:
@@ -720,6 +725,12 @@ TTFT y tok/s del LLM local; RTF y latencia p50/p95 de STT y TTS; sesiones
 concurrentes hasta saturar; VRAM/RAM por sesión; costo por minuto de conversación
 (local vs externa). **Ninguna cifra se promete hasta medirla; los objetivos
 son metas, no resultados garantizados.**
+
+Hallazgo registrado (2026-11-16, TD-F0-008): Qwen3.5-4B razona por defecto
+(`reasoning_content`); con `chat_template_kwargs:{"enable_thinking":false}` el
+TTFT medido es 0.22–0.43 s y la generación ~43–50 tok/s en P100. La regla de
+la arquitectura conversacional: **thinking desactivado en el loop de voz**;
+thinking solo para tareas offline.
 
 ---
 

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>talkdrill — Lab Fase 0 (WebRTC)</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background:#0f1420; color:#e8ecf4;
+         max-width: 860px; margin: 1rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.2rem; }
+  fieldset { border:1px solid #2b3654; border-radius:8px; margin:.6rem 0; padding:.6rem .8rem; }
+  legend { color:#9db2ff; font-size:.85rem; }
+  button { background:#2b6cff; color:#fff; border:0; border-radius:6px;
+           padding:.45rem .9rem; font-size:.95rem; cursor:pointer; margin-right:.4rem; }
+  button.secondary { background:#33415e; }
+  button:disabled { opacity:.4; cursor:default; }
+  input[type=password], input[type=text] { background:#1a2236; border:1px solid #2b3654;
+    color:#e8ecf4; border-radius:6px; padding:.35rem .5rem; width: 22rem; }
+  .status { font-family: ui-monospace, monospace; font-size:.85rem; color:#9fe8b0; }
+  .warn { color:#ffd479; }
+  pre { background:#161d30; border:1px solid #2b3654; border-radius:8px;
+        padding:.5rem .7rem; max-height: 16rem; overflow:auto; font-size:.78rem; }
+  canvas { background:#161d30; border:1px solid #2b3654; border-radius:8px; }
+  label { user-select:none; }
+</style>
+</head>
+<body>
+<h1>talkdrill — Laboratorio Fase 0 · WebRTC 1:1 (aiortc)</h1>
+
+<fieldset>
+  <legend>Acceso de laboratorio</legend>
+  Token (<code>x-lab-token</code>):
+  <input id="labToken" type="password" placeholder="cambia-esto-..." autocomplete="off">
+</fieldset>
+
+<fieldset>
+  <legend>Conexión</legend>
+  <label><input type="checkbox" id="forceRelay"> Forzar relay TURN (<code>iceTransportPolicy: relay</code>)</label><br><br>
+  <button id="btnConnect">Conectar</button>
+  <button id="btnDisconnect" class="secondary" disabled>Desconectar</button>
+  <button id="btnPing" class="secondary" disabled>Ping DataChannel</button>
+  <button id="btnReport" class="secondary" disabled>Reportar ICE (getStats)</button>
+</fieldset>
+
+<fieldset>
+  <legend>Estado</legend>
+  <div class="status" id="status">desconectado</div>
+  <audio id="remoteAudio" autoplay></audio>
+</fieldset>
+
+<fieldset>
+  <legend>Avatar de prueba (lip-sync por visemas)</legend>
+  <canvas id="mouth" width="240" height="140"></canvas>
+  <div class="status" id="visemeLine"></div>
+</fieldset>
+
+<fieldset>
+  <legend>Eventos (DataChannel <code>events</code>)</legend>
+  <pre id="log"></pre>
+</fieldset>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+const log = (...a) => { logEl.textContent = `[${new Date().toLocaleTimeString()}] ${a.join(' ')}\n` + logEl.textContent; };
+const token = () => { const t = $('labToken').value.trim(); if (t) localStorage.setItem('labToken', t); return t || localStorage.getItem('labToken') || ''; };
+$('labToken').value = localStorage.getItem('labToken') || '';
+
+const headers = () => ({ 'Content-Type': 'application/json', 'x-lab-token': token() });
+const labURL = (path) => path;  // mismo origen
+
+let pc = null, dc = null, localStream = null, statsTimer = null;
+
+async function fetchJSON(path, opts = {}) {
+  const r = await fetch(labURL(path), { headers: headers(), ...opts });
+  if (!r.ok) throw new Error(`${path} -> ${r.status}: ${await r.text()}`);
+  return r.json();
+}
+async function postJSON(path, body) {
+  return fetchJSON(path, { method: 'POST', body: JSON.stringify(body) });
+}
+
+// ---------- Lip-sync de prueba ----------
+const OPENNESS = { sil: 0.0, B: 0.15, AA: 1.0, EE: 0.65, OO: 0.8, AI: 0.75, IH: 0.6, OU: 0.8 };
+let visemeQueue = [], visemeStart = 0;
+const canvas = $('mouth'), ctx = canvas.getContext('2d');
+function drawMouth(openness) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#1a2236'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#e8ecf4'; ctx.beginPath(); ctx.ellipse(120, 70, 80, 34, 0, 0, 2*Math.PI); ctx.fill();
+  const h = 4 + openness * 26;
+  ctx.fillStyle = '#402028'; ctx.beginPath(); ctx.ellipse(120, 70, 56, h, 0, 0, 2*Math.PI); ctx.fill();
+}
+drawMouth(0);
+function playVisemeTimeline(visemes) {
+  visemeQueue = visemes.map(v => ({ ...v, at: performance.now() + v.t_ms }));
+}
+function visemeTick() {
+  const now = performance.now();
+  let current = visemeQueue.filter(v => v.at <= now).pop();
+  if (current) { drawMouth(OPENNESS[current.id] ?? current.weight * 0.8); $('visemeLine').textContent = `viseme: ${current.id} (w=${current.weight})`; }
+  requestAnimationFrame(visemeTick);
+}
+visemeTick();
+
+function handleEvent(msg) {
+  let data; try { data = JSON.parse(msg); } catch { log('mensaje no-JSON:', msg); return; }
+  if (data.type === 'assistant_response' && Array.isArray(data.visemes)) playVisemeTimeline(data.visemes);
+  log('⇐', data.type, data.correction ? `(${data.correction.reason})` : '');
+  if (data.type === 'echo') log('   ↳ echo:', JSON.stringify(data.received).slice(0, 200));
+}
+
+// ---------- Stats / telemetría ----------
+async function collectCandidatePair() {
+  if (!pc) return null;
+  const stats = await pc.getStats();
+  let nominated = null;
+  stats.forEach(r => { if (r.type === 'candidate-pair' && (r.nominated || r.state === 'succeeded')) nominated = r; });
+  if (!nominated) return null;
+  let local = null; stats.forEach(r => { if (r.id === nominated.localCandidateId) local = r; });
+  return {
+    candidateType: local?.candidateType ?? 'unknown',
+    rttMs: nominated.currentRoundTripTime != null ? Math.round(nominated.currentRoundTripTime * 1000) : null,
+    bytesSent: nominated.bytesSent, bytesReceived: nominated.bytesReceived
+  };
+}
+function startStats() {
+  clearInterval(statsTimer);
+  statsTimer = setInterval(async () => { const p = await collectCandidatePair(); if (p) $('status').textContent = `conectado · ${p.candidateType} · RTT ${p.rttMs} ms · ↓${p.bytesReceived} B ↑${p.bytesSent} B`; }, 1000);
+}
+
+async function reportICE() {
+  const p = await collectCandidatePair();
+  if (!p) { log('sin candidate-pair nominado aún'); return; }
+  await postJSON('/webrtc/ice-report', { source: 'lab-client', ...p, ua: navigator.userAgent });
+  log('→ /webrtc/ice-report enviado', JSON.stringify(p));
+}
+
+// ---------- Ciclo de conexión ----------
+function waitIceGathering(p) {
+  return new Promise(resolve => {
+    if (p.iceGatheringState === 'complete') return resolve();
+    const t = setTimeout(resolve, 3000);
+    p.addEventListener('icegatheringstatechange', () => {
+      if (p.iceGatheringState === 'complete') { clearTimeout(t); resolve(); }
+    });
+  });
+}
+
+$('btnConnect').onclick = async () => {
+  try {
+    $('btnConnect').disabled = true;
+    $('status').textContent = 'pidiendo credenciales TURN…';
+    const { iceServers } = await fetchJSON('/ice-credentials', { method: 'POST' });
+    const relay = $('forceRelay').checked;
+    pc = new RTCPeerConnection({ iceServers, iceTransportPolicy: relay ? 'relay' : 'all' });
+
+    pc.oniceconnectionstatechange = () => log('iceConnectionState:', pc.iceConnectionState);
+    pc.onconnectionstatechange = () => { log('connectionState:', pc.connectionState); $('status').textContent = pc.connectionState; };
+    pc.onicecandidate = (e) => { if (e.candidate) log('candidate:', e.candidate.candidate.slice(0, 120)); };
+    pc.ontrack = (e) => { $('remoteAudio').srcObject = e.streams[0]; log('track remoto (audio) recibido'); };
+
+    dc = pc.createDataChannel('events', { ordered: true });
+    dc.onopen = () => { log('datachannel "events" abierto'); $('btnPing').disabled = false; $('btnReport').disabled = false; };
+    dc.onmessage = (e) => handleEvent(e.data);
+
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    localStream.getAudioTracks().forEach(t => pc.addTrack(t, localStream));
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitIceGathering(pc);
+    $('status').textContent = 'negociando (setRemoteDescription)…';
+    const answer = await postJSON('/offer', { sdp: pc.localDescription.sdp, type: pc.localDescription.type });
+    await pc.setRemoteDescription(answer);
+    log('conexión negociada; esperando tracks…');
+    startStats();
+    $('btnDisconnect').disabled = false;
+  } catch (err) {
+    log('ERROR:', err.message);
+    $('status').textContent = 'error: ' + err.message;
+    $('btnConnect').disabled = false;
+  }
+};
+$('btnDisconnect').onclick = () => {
+  clearInterval(statsTimer);
+  if (dc) dc.close(); if (pc) pc.close();
+  if (localStream) localStream.getTracks().forEach(t => t.stop());
+  pc = localStream = null; dc = null; drawMouth(0);
+  $('remoteAudio').srcObject = null;
+  $('btnConnect').disabled = false; $('btnDisconnect').disabled = true; $('btnPing').disabled = true; $('btnReport').disabled = true;
+  $('status').textContent = 'desconectado'; log('desconectado');
+};
+$('btnPing').onclick = () => { if (dc && dc.readyState === 'open') { dc.send(JSON.stringify({ type: 'client_ping', t: Date.now() })); log('→ client_ping'); } };
+$('btnReport').onclick = () => reportICE().catch(e => log('ERROR report:', e.message));
+</script>
+</body>
+</html>

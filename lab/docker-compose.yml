@@ -1,0 +1,67 @@
+# =============================================================================
+# Lab talkdrill — Fase 0 (aislado; NADA de esto toca el entorno existente)
+# Uso:
+#   cp .env.lab.example .env.lab   # rellena secretos
+#   docker compose -f docker-compose.yml --env-file .env.lab up -d coturn llm lab-server
+# Puertos del laboratorio (todos locales, ninguno publicado globalmente):
+#   3478/udp+tcp, 49152-49200/udp ......... coturn (network_mode: host, solo laboratorio)
+#   127.0.0.1:9080 ........................ llama-server (Qwen3.5-4B, P100)
+#   127.0.0.1:9090 ........................ aiortc lab server
+# STT (9081) y TTS (9082): se añaden cuando se ejecuten benchmarks (ver README).
+# =============================================================================
+services:
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host        # igual que mxerp: relay range UDP sin miles de port mappings
+    restart: unless-stopped
+    command:
+      - "-c"
+      - "/etc/turnserver.conf"
+      - "--static-auth-secret=${TURN_SHARED_SECRET}"
+      - "--realm=${TURN_REALM}"
+      - "--server-name=${TURN_REALM}"
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf:ro
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    container_name: talkdrill-lab-llm
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LLM_HOST_PORT:-9080}:8080"
+    volumes:
+      - ${LLM_MODEL_DIR}:/models:ro          # lectura; el modelo no se modifica
+    command:
+      - "-m"
+      - "/models/${LLM_MODEL_FILE}"
+      - "-c"
+      - "${LLM_CTX:-8192}"
+      - "--n-gpu-layers"
+      - "99"
+      - "-b"
+      - "2048"
+      - "--parallel"
+      - "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  lab-server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: talkdrill-lab-server:dev
+    container_name: talkdrill-lab-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LAB_SERVER_HOST_PORT:-9090}:9090"
+    environment:
+      LAB_TOKEN: ${LAB_TOKEN}
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET}
+      TURN_REALM: ${TURN_REALM}
+      TURN_MIN_PORT: ${TURN_MIN_PORT:-49152}
+      TURN_MAX_PORT: ${TURN_MAX_PORT:-49200}

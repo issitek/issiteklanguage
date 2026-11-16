@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+# Node
+node_modules/
+dist/
+# Lab
+lab/.env.lab
+lab/models/
+# Datos y audios de prueba (regenerables)
+lab/data/
+*.wav
+# Sistema
+.DS_Store
