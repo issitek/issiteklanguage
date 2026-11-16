@@ -123,7 +123,9 @@ Dato crítico para el go/no-go: el humo con Kokoro **solo** valida integración 
 la evidencia de es-MX vendrá de las etiquetas humanas (P1–P4, pendiente).
 
 - Contenedor `talkdrill-lab-pronunciation` (CPU, aislado de la P100 y de Qwen/LFM; openpronounce MIT; torch CPU; `OPENPRONOUNCE_TTS=kokoro` voz af_heart). Primero run ~2.4 GB de checkpoints Wav2Vec2 + `spacy download en_core_web_sm` horneado en la imagen (sin red en runtime).
-- Humo (frases exactas, WAV Kokoro): `smoke-think.wav` "I think this is the right thing." → **score 98.39**, PER 0.0, 0 errores; `smoke-howareyou.wav` → **score 100.0**. Las rutas de error están implementadas (arrays `errors[]` con IPA esperada/detectada + confianza) pero no se ejercen hasta P2/P3.
+- Humo (frases exactas, WAV Kokoro): `smoke-think.wav` → **score 98.39**, PER 0.0; `smoke-howareyou.wav` → **score 100.0**.
+- **Bench offline** (`--network none` + `HF_HUB_OFFLINE=1`, CPU, warm): **mean 96.59** sobre las 30 frases Kokoro; **p50 1.61 s / p95 1.95 s** por utterance. Señal: hasta nativo marca errores a veces («teacher» en frase 25, 90.46) — vigilar FPR al calibrar.
+- **Controles A/B/C/D** (automatizados): mismatch A1/A2 → score ~1–3 con errores detectados; ruido SNR 10/20 dB → ~96 (intacto); truncado 0.8 s → 39.37 con 2 errores; −15 dB → 99.19. Ver `docs/fase0/poc-pronunciacion.md` para tablas y comandos exactos.
 - Latencia CLI ~28 s por utterance en frío (CPU); el bench se medirá en caliente/servidor (P2).
 - Datos: `lab/data/pronunciation/` (audio/consent/labels/manifest) **excluidos de git** (`lab/data/` en `.gitignore`); consentimiento obligatorio con plantilla `docs/fase0/consentimiento-plantilla.md`.
 - Guion de 30 frases orientadas /θ ð ɪ iː ɹ ʃ tʃ/: `docs/fase0/guion-pronunciacion.md`. Plantillas: `labels-template.csv`. Consentimiento: `consentimiento-plantilla.md`.

@@ -96,3 +96,13 @@ docker compose --env-file .env.lab --profile poc run --rm pronunciation \
 Guion y consentimiento para grabarse con voluntarios:
 `docs/fase0/guion-pronunciacion.md` · audios en `lab/data/pronunciation/` (fuera de git).
 Calibrado es-MX (P3) y decisión (P4): faltan las grabaciones.
+
+# Bench offline real (red cortada; caché de modelos)
+P=$PWD/lab/data/pronunciation
+docker run --rm --network none -e HF_HUB_OFFLINE=1 \
+  -v lab_pronunciation-models:/models \
+  -v "$P:/data:ro" -v "$PWD/lab/pronunciation:/poc:ro" \
+  --entrypoint python talkdrill-lab-pronunciation:dev \
+  /poc/bench.py --dir /data/control-kokoro \
+    --manifest /data/control-kokoro/control-kokoro-manifest.json
+# Controles A/B/C/D ya generados: /poc/controls.py (stdlib; escribir en host)
