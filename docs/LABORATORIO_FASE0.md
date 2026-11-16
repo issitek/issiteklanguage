@@ -70,7 +70,8 @@ Qwen/LFM existentes. Secreto TURN propio (`talkdrill-lab`) vía `.env.lab` (no v
 1. **Qwen3.5-4B razona por defecto** (`reasoning_content` antes que `content`). Sin desactivarlo, el TTFT clínicamente útil no llega y el bench queda inutilizable para conversación. Con `chat_template_kwargs: {"enable_thinking": false}`: TTFT 0.22–0.43 s y ~43–50 tok/s de generación en P100. **Decisión para la arquitectura:** la conversación siempre llama con thinking desactivado; thinking queda para usos offline (análisis de sesión, currículum adaptativo).
 2. **Calidad pedagógica de muestra** (`Yesterday I go to the school.`): corrección correcta (`went`, artículo omitido), explicación amable en español, JSON válido según maestro §8.3.
 3. **Desviación de esquema:** el modelo devolvió `"emotion": "encouraged"` (no está en el enum `encouraging`). El **AI Router debe normalizar** emociones (whitelist + sinónimos) antes de mandarlas al avatar; añadirlo a TD-F2-002.
-4. Evaluación formal del set de 30 prompts (precisión pedagógica) pendiente — requiere el loop E2E (TD-F0-008 completo).
+4. Set de 30 prompts ejecutado (TD-F0-008/019): **JSON 30/30, emociones 30/30, corrección 23/30 (77% estricto)**; fallos reales: artículos, to-infinitive, present perfect continuous (y un cambio de persona en #14). Ver `docs/fase0/resultados-30-prompts.md`.
+5. Experimento few-shot: 19/30 (63%) — rechazado; prompt por defecto simple.
 
 GPU LLM (lab): ~3.3 GB VRAM (Q4_K_M). Con VAD+Whisper+TTS caben en los 16 GB de la P100.
 
