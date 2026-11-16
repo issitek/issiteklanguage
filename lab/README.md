@@ -11,8 +11,8 @@ propios (`talkdrill-lab-*`), puertos locales documentados abajo.
 |---|---|---|
 | 3478, 49152–49200 | coturn laboratorio (STUN/TURN REST-only) | ✅ configurado |
 | 9080 | llama-server (Qwen3.5-4B Q4_K_M, P100) | ✅ configurado |
-| 9081 | faster-whisper bench (pendiente TD-F0-006) | reservado |
-| 9082 | Kokoro / Qwen3-TTS bench (pendiente TD-F0-009/010) | reservado |
+| 9081 | STT bench (own container `talkdrill-lab-stt`, no port published) | en uso |
+| 9082 | Kokoro TTS bench EN (`remsky/kokoro-fastapi-cpu`) | en uso |
 | 9090 | lab-server (aiortc: echo + DataChannel + TURN creds) | ✅ configurado |
 | 5060/8080/7000/… | **NO usar** (ocupados por proyectos existentes) | — |
 
@@ -57,19 +57,25 @@ en el canvas «Avatar de prueba» se anima la boca según visemas; botón
 | TD-F0-015 (iPhone real) | Idem en iPhone; si WKWebView falla → documentar plan B (plugin Capacitor WebRTC) |
 | TD-F0-016 (NAT restrictivo) | Probar con datos móviles/forzar relay; necesita red externa |
 | TD-F0-017 (reconexión) | Guion manual de corte de red 10 s/60 s en navegador |
-| TD-F0-006/007 (STT) | faster-whisper bench (descarga ~460 MB modelo); comando abajo |
-| TD-F0-009/010 (TTS) | Kokoro 82M EN / ES y Qwen3-TTS; descarga de modelos; comando abajo |
+| TD-F0-010 (TTS ES) | Voz española: Kokoro ES o Qwen3-TTS 0.6B; bench pendiente |
+| Voz humana es-MX | STT con grabación humana real (este bench usa espeak-ng de VozNativa) |
 | TD-F0-011…013, 018 | Loop E2E completo, barge-in real, costo por minuto |
 
-### Comandos preparados para STT/TTS (cuando se decida descargar modelos)
+### STT/TTS ya ejecutados (2026-11-16)
 
 ```bash
-# faster-whisper server (CPU) — test rápido con un WAV propio:
-docker run --rm -v "$PWD/data:/data" ghcr.io/speaches-ai/speaches:latest-cpu   # OpenAI-compatible /v1/audio/transcriptions
-# Kokoro (CPU vale para el bench):
-docker run --rm -p 127.0.0.1:9082:8880 ghcr.io/remsky/kokoro-fastapi-cpu:latest
+# TTS Kokoro EN (contenedor talkdrill-lab-tts, 127.0.0.1:9082)
+docker run -d --name talkdrill-lab-tts -p 127.0.0.1:9082:8880 ghcr.io/remsky/kokoro-fastapi-cpu:latest
+# → generó lab/data/s01…s10.wav + manifest.json (Kokoro af_heart, 24 kHz mono) en 0.56 s/utterance
+
+# STT faster-whisper small CPU int8 (imagen propia)
+docker build -t talkdrill-lab-stt lab/stt
+docker run --rm -v "$PWD/lab/data:/data:ro" talkdrill-lab-stt --dir /data --manifest /data/manifest.json
+# → WER 0.000 (10/10), ~2.2 s por frase
+docker run --rm -v /home/dev/share/VozNativa/scratch:/es:ro talkdrill-lab-stt --file /es/bench-es.wav --lang es
+# → smoke test es-419: 1 palabra confundida (Ahora→Hola)
+# Nota: faster-whisper (CT2 CUDA 12) no soporta Pascal/P100 → STT solo CPU en este host.
 ```
-(Los flags/imágenes se confirman en el momento del bench; no se ejecutan hasta entonces.)
 
 ## Regla de seguridad del laboratorio
 

@@ -920,6 +920,7 @@ Criterios de aceptación por fase: ver `BACKLOG.md`.
 | R8 | Licencias de modelos (Kokoro/Qwen/whisper) | Bajo-Medio | Revisar licencias antes de producción comercial; atribución; sustitución vía AI Router si cambia licencia |
 | R9 | Pérdida de DataChannel degrada avatar (sin visemas) | Bajo | Fallback lip-sync derivado del stream; evento `error` y degradación elegante |
 | R10 | TURN relé forzado satura coturn (tráfico relay) | Medio | Medir % relay en telemetría; dimensionar coturn; alertar; considerar TURN geográfico si crece |
+| R11 | faster-whisper/CTranslate2 (CUDA 12) no soporta Pascal (P100, sm_60) → STT en CPU en el host actual | Medio | STT CPU en desarrollo (~2.2 s/utterance medidos); en producción: GPU sm_70+, build CT2 compatible, o servidor STT externo; revisar al dimensionar infra |
 
 ---
 

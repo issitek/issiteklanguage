@@ -34,12 +34,12 @@ Qwen/LFM existentes. Secreto TURN propio (`talkdrill-lab`) vía `.env.lab` (no v
 | Sesión | Suspensión y reanudación de app (móvil/navegador) | ⬜ pendiente | |
 | Sesión | Reconexión tras corte 10 s / 60 s | ⬜ pendiente (TD-F0-017) | |
 | Sesión | Barge-in: alumno interrumpe al profesor | ⬜ pendiente (TD-F0-013) | |
-| Modelo | STT es-MX base/small (faster-whisper) | ⬜ pendiente (TD-F0-006) | |
-| Modelo | STT CPU fallback | ⬜ pendiente (TD-F0-007) | |
+| Modelo | STT es-MX base/small (faster-whisper) | 🟡 smoke test OK (espeak-ng); voz humana pendiente | §3.4 |
+| Modelo | STT CPU fallback | ✅ PASS (STT solo CPU en este host) | §3.4 |
 | Modelo | LLM Qwen3.5-4B — calidad pedagógica (set prompts §fase0) | 🟡 bench TTFT/tok/s ejecutado (PASS); set 30 prompts pendiente | `lab/bench_llm.py`, §3.2 |
 | Red | coturn lab Allocate + relay HMAC (automatizado) | ✅ PASS (2026-11-16) | §3.1 |
 | E2E | aiortc echo + DataChannel (automatizado) | ✅ PASS (2026-11-16) | §3.3 |
-| Modelo | TTS EN Kokoro 82M | ⬜ pendiente (TD-F0-009) | |
+| Modelo | TTS EN Kokoro 82M | ✅ PASS (0.56 s/utterance CPU) | §3.4 |
 | Modelo | TTS ES (Kokoro ES o Qwen3-TTS 0.6B) | ⬜ pendiente (TD-F0-010) | |
 | E2E | Loop WebRTC→STT→LLM→TTS→RTP→visemes (Chrome escritorio) | ⬜ pendiente (TD-F0-011…012) | |
 | E2E | Sesión estable ≥ 15 min | ⬜ pendiente | |
@@ -85,10 +85,29 @@ GPU LLM (lab): ~3.3 GB VRAM (Q4_K_M). Con VAD+Whisper+TTS caben en los 16 GB de 
 
 - WebRTC navegador ↔ aiortc ↔ navegador vía el mismo PC (echo): audio de vuelta recibido en ~1 s.
 - DataChannel `events` entrega `listening_state` y `assistant_response` (visemas incluidos) → página `http://127.0.0.1:9090/` lista para TD-F0-004 manual (Chrome escritorio) y para el guion de Fase 0 en Android/iPhone.
-- Pendiente en este entorno: prueba manual Chrome, Android real, iPhone real, relay forzado, reconexión, barge-in real, STT/TTS bench.
+- Pendiente en este entorno: prueba manual Chrome, Android real, iPhone real, relay forzado, reconexión, barge-in real, loop E2E con STT/TTS real, evaluación del set de 30 prompts.
 
-### 3.4 STT / TTS
-- Pendiente (ver `lab/README.md`, comandos preparados; no se descargan modelos hasta decidir).
+### 3.4 STT / TTS — ✅ PASS en EN (2026-11-16 UTC)
+
+**TTS EN (Kokoro 82M, `remsky/kokoro-fastapi-cpu` en 127.0.0.1:9082, voz `af_heart`):**
+- Síntesis de ~1 s de audio en **0.56 s** en CPU (RTF < 1) → la TTS no será el cuello de botella.
+- 10 frases A1–A2/en-US generadas y guardadas en `lab/data/s01…s10.wav` (24 kHz mono PCM).
+
+**STT EN (faster-whisper **small**, CPU int8, imagen `talkdrill-lab-stt` provisionada hoy):**
+- Transcripción de las 10 frases Kokoro: **WER = 0.000 (10/10)**, latencia media **~2.2 s** por frase.
+- Nota metodológica: son audios limpios sintetizados; el WER real con voz humana,
+  ruido y acento mexicano se medirá con el piloto (no extrapolable de este bench).
+
+**STT es-MX (smoke test, `bench-es.wav` de VozNativa, espeak-ng es-419 — NO voz humana):**
+- Hipótesis: «Hola, quiero crear una nueva cotización para el cliente con los productos que necesita.»
+  (esperado: «**Ahora**, quiero crear…») → 1 palabra confundida (Ahora→Hola), resto correcto.
+- Válido como smoke test; la validación con voz humana en es-MX queda pendiente (dispositivo/piloto).
+
+**Restricción de la P100:** faster-whisper (CTranslate2, CUDA 12) no soporta Pascal (sm_60);
+el STT corre en CPU en este host. Aceptable para desarrollo; producción requiere GPU sm_70+
+o build compatible (nuevo riesgo R11 en maestro §15). Qwen3.5-4B (llama.cpp GGUF) sí aprovecha la P100 (~3.3 GB VRAM).
+
+**Pendiente:** voz española TTS (TD-F0-010), STT con voz humana es-MX, bench bajo concurrencia.
 
 ## 4. Decisión go/no-go
 
