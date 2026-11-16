@@ -204,6 +204,8 @@ class PeerSession:
             return
         log.info("STT (%d ms): %s", stt_ms, student_text)
         self.history.append({"role": "user", "content": student_text})
+        await self.send_event({"type": "student_transcript", "text": student_text,
+                               "metrics": {"stt_ms": stt_ms}})
 
         await self.send_event({"type": "listening_state", "state": "thinking"})
         answer, llm_dt = await call_llm(self.history, student_text)
