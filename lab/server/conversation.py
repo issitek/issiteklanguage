@@ -199,7 +199,7 @@ def _stt_sync(pcm_bytes: bytes) -> tuple[str, float]:
     _load_whisper()
     audio = np.frombuffer(pcm_bytes, dtype=np.int16).astype(np.float32) / 32768.0
     t0 = time.perf_counter()
-    segments, _info = _whisper_model.transcribe(audio, language=None, beam_size=5, vad_filter=False)
+    segments, _info = _whisper_model.transcribe(audio, language=None, beam_size=2, vad_filter=False)
     text = " ".join(seg.text.strip() for seg in segments).strip()
     return text, time.perf_counter() - t0
 

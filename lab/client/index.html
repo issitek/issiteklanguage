@@ -51,7 +51,8 @@
 
 <fieldset>
   <legend>Conexión</legend>
-  <label><input type="checkbox" id="forceRelay"> Forzar relay TURN (<code>iceTransportPolicy: relay</code>)</label><br><br>
+  <label><input type="checkbox" id="forceRelay"> Forzar relay TURN (<code>iceTransportPolicy: relay</code>)</label><br>
+  <label><input type="checkbox" id="bargeIn"> Barge-in: micrófono siempre activo <span style="opacity:.65">(requiere audífonos)</span></label><br><br>
   <button id="btnConnect">Conectar</button>
   <button id="btnDisconnect" class="secondary" disabled>Desconectar</button>
   <button id="btnPing" class="secondary" disabled>Ping DataChannel</button>
@@ -126,6 +127,18 @@ function visemeTick() {
 }
 visemeTick();
 
+// ---------- Gate automático de micrófono (semi-dúplex) ----------
+// Con barge-in desactivado (default): el mic se silencia mientras Alex piensa/habla
+// para que el micrófono NO capte la voz del profesor (ni ruido al inicio del turno).
+function applyMicGate(state) {
+  if ($('bargeIn').checked || !localStream) return;
+  const muted = (state === 'thinking' || state === 'speaking');
+  localStream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+  $('status').textContent = $('status').textContent.replace(/ · mic: [^·]*/g, '')
+    + (muted ? ' · mic: auto-mute' : ' · mic: activo');
+}
+$('bargeIn').addEventListener('change', () => { if (localStream) localStream.getAudioTracks().forEach(t => { t.enabled = true; }); log($('bargeIn').checked ? 'barge-in: mic siempre activo' : 'auto-mute activado (mic sigue el estado listening/thinking/speaking)'); });
+
 // ---------- Subtítulos / conversación ----------
 const captionsEl = $('captions');
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -165,7 +178,12 @@ function handleEvent(msg) {
     log('⇐ Alex:', data.text);
     return;
   }
-  if (data.type === 'listening_state') { $('visemeLine').textContent = `estado: ${data.state}`; log('estado:', data.state); return; }
+  if (data.type === 'listening_state') {
+    $('visemeLine').textContent = `estado: ${data.state}`;
+    applyMicGate(data.state);
+    log('estado:', data.state);
+    return;
+  }
   if (data.type === 'interrupt') { addBubble('sys', '⏹ Alex se detuvo (interrupción)'); log('¡INTERRUPT!', JSON.stringify(data)); return; }
   log('⇐', data.type);
   if (data.type === 'echo') log('   ↳ echo:', JSON.stringify(data.received).slice(0, 200));
@@ -201,7 +219,7 @@ async function reportICE() {
 function waitIceGathering(p) {
   return new Promise(resolve => {
     if (p.iceGatheringState === 'complete') return resolve();
-    const t = setTimeout(resolve, 3000);
+    const t = setTimeout(resolve, 1200);
     p.addEventListener('icegatheringstatechange', () => {
       if (p.iceGatheringState === 'complete') { clearTimeout(t); resolve(); }
     });
