@@ -146,15 +146,24 @@ class SpeakerTrack(MediaStreamTrack):
 
 
 class EnergyVAD:
-    """VAD por energía con hangover (sin dependencias externas)."""
+    """VAD por energía adaptativo: estima el piso de ruido de la sala y lo usa
+    como referencia. En habitaciones con ruido estable (ventilador, tráfico,
+    aire) el umbral sube solo; en silencio baja. Tope duro de 15 s por turno."""
 
-    def __init__(self, sample_rate=SAMPLERATE_IN, frame_ms=20, threshold=750,
+    MAX_FRAMES = 750  # 15 s de 20 ms
+
+    def __init__(self, sample_rate=SAMPLERATE_IN, frame_ms=20, base_threshold=400,
+                 start_mult=3.0, end_mult=2.2,
                  speech_start_windows=3, silence_end_windows=25):
-        self.threshold = threshold
+        self.base_threshold = base_threshold
+        self.start_mult = start_mult
+        self.end_mult = end_mult
         self.speech_start = speech_start_windows
         self.silence_end = silence_end_windows
+        self.noise_floor = 150.0  # se autocalibra en las primeras ventanas
         self.streak_voiced = 0
         self.streak_silence = 0
+        self.frames_in_speech = 0
         self.in_speech = False
 
     def rms(self, window: np.ndarray) -> float:
@@ -163,28 +172,44 @@ class EnergyVAD:
         x = window.astype(np.float32)
         return float(math.sqrt(np.mean(x * x)))
 
+    def threshold(self, mult: float) -> float:
+        return max(self.base_threshold, self.noise_floor * mult)
+
     def feed(self, window: np.ndarray) -> str | None:
-        """Devuelve 'speech_start' | 'speech_end' | None."""
-        voiced = self.rms(window) > self.threshold
+        rms = self.rms(window)
         if not self.in_speech:
-            if voiced:
-                self.streak_voiced += 1
-                if self.streak_voiced >= self.speech_start:
-                    self.in_speech = True
-                    self.streak_silence = 0
-                    return "speech_start"
-            else:
+            # Fuera de turno: actualizar piso de ruido solo cuando no hay voz probable
+            voiced = rms > self.threshold(self.start_mult)
+            if not voiced:
+                self.noise_floor = 0.92 * self.noise_floor + 0.08 * rms
                 self.streak_voiced = 0
+                return None
+            self.streak_voiced += 1
+            if self.streak_voiced >= self.speech_start:
+                self.in_speech = True
+                self.streak_silence = 0
+                self.frames_in_speech = 0
+                return "speech_start"
             return None
-        if voiced:
-            self.streak_silence = 0
-        else:
+        self.frames_in_speech += 1
+        end_threshold = self.threshold(self.end_mult)
+        if rms < end_threshold:
             self.streak_silence += 1
-            if self.streak_silence >= self.silence_end:
-                self.in_speech = False
-                self.streak_voiced = 0
-                return "speech_end"
+        else:
+            self.streak_silence = 0
+        if self.streak_silence >= self.silence_end:
+            self._reset()
+            return "speech_end"
+        if self.frames_in_speech >= self.MAX_FRAMES:
+            self._reset()
+            return "speech_end"
         return None
+
+    def _reset(self):
+        self.in_speech = False
+        self.streak_voiced = 0
+        self.streak_silence = 0
+        self.frames_in_speech = 0
 
 
 _whisper_model = None

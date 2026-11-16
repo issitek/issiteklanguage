@@ -39,6 +39,8 @@
           background:#33415e; color:#cdd6f4; margin-left:.4rem; vertical-align:middle; }
   .meta { font-size:.66rem; color:#8b96b8; margin-top:.25rem; }
   .translation { font-size:.82rem; color:#aeb9e0; font-style:italic; margin-top:.15rem; }
+  .talk { background:#27a35c; font-size:1.1rem; padding:.6rem 1.2rem; margin-top:.4rem; touch-action:none; user-select:none; }
+  .talk.active { background:#ff5252; transform:scale(1.03); }
 </style>
 </head>
 <body>
@@ -53,11 +55,13 @@
 <fieldset>
   <legend>Conexión</legend>
   <label><input type="checkbox" id="forceRelay"> Forzar relay TURN (<code>iceTransportPolicy: relay</code>)</label><br>
-  <label><input type="checkbox" id="bargeIn"> Barge-in: micrófono siempre activo <span style="opacity:.65">(requiere audífonos)</span></label><br><br>
+  <label><input type="checkbox" id="bargeIn"> Barge-in: micrófono siempre activo <span style="opacity:.65">(requiere audífonos)</span></label><br>
+  <label><input type="checkbox" id="ptt"> Pulsar-para-hablar: mantén «Hablar» (o Espacio) para hablar <span style="opacity:.65">(cero ruido fantasma)</span></label><br><br>
   <button id="btnConnect">Conectar</button>
   <button id="btnDisconnect" class="secondary" disabled>Desconectar</button>
   <button id="btnPing" class="secondary" disabled>Ping DataChannel</button>
   <button id="btnReport" class="secondary" disabled>Reportar ICE (getStats)</button>
+  <button id="btnTalk" class="talk" style="display:none">🎙 Mantén «Hablar»</button>
 </fieldset>
 
 <fieldset>
@@ -128,17 +132,38 @@ function visemeTick() {
 }
 visemeTick();
 
-// ---------- Gate automático de micrófono (semi-dúplex) ----------
-// Con barge-in desactivado (default): el mic se silencia mientras Alex piensa/habla
-// para que el micrófono NO capte la voz del profesor (ni ruido al inicio del turno).
+// ---------- Gate automático de micrófono (semi-dúplex) + pulsar-para-hablar ----------
+const pttActive = () => $('ptt').checked;
+function setMic(on) {
+  if (!localStream) return;
+  localStream.getAudioTracks().forEach(t => { t.enabled = on; });
+}
 function applyMicGate(state) {
-  if ($('bargeIn').checked || !localStream) return;
+  if ($('bargeIn').checked || pttActive() || !localStream) return;
   const muted = (state === 'thinking' || state === 'speaking');
-  localStream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+  setMic(!muted);
   $('status').textContent = $('status').textContent.replace(/ · mic: [^·]*/g, '')
     + (muted ? ' · mic: auto-mute' : ' · mic: activo');
 }
-$('bargeIn').addEventListener('change', () => { if (localStream) localStream.getAudioTracks().forEach(t => { t.enabled = true; }); log($('bargeIn').checked ? 'barge-in: mic siempre activo' : 'auto-mute activado (mic sigue el estado listening/thinking/speaking)'); });
+$('bargeIn').addEventListener('change', () => { if (localStream && !pttActive()) setMic(true); log($('bargeIn').checked ? 'barge-in: mic siempre activo' : 'auto-mute activado (mic sigue el estado listening/thinking/speaking)'); });
+$('ptt').addEventListener('change', () => {
+  const on = pttActive();
+  $('bargeIn').disabled = on;
+  $('btnTalk').style.display = on ? 'inline-block' : 'none';
+  if (on) { setMic(false); log('pulsar-para-hablar ACTIVADO: mantén «Hablar» o Espacio para hablar'); }
+  else { setMic(true); log('pulsar-para-hablar desactivado'); }
+});
+function talk(on) {
+  if (!pttActive()) return;
+  setMic(on);
+  $('btnTalk').classList.toggle('active', on);
+  $('btnTalk').textContent = on ? '🔴 Hablando… (suelta para enviar)' : '🎙 Mantén «Hablar»';
+  if (on) log('● turno abierto (mantén)'); else log('■ turno cerrado (sueltas)');
+}
+$('btnTalk').addEventListener('pointerdown', e => { e.preventDefault(); talk(true); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('btnTalk').addEventListener(ev, () => talk(false)));
+window.addEventListener('keydown', e => { if (e.code === 'Space' && pttActive() && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); if (!e.repeat) talk(true); } });
+window.addEventListener('keyup', e => { if (e.code === 'Space' && pttActive()) talk(false); });
 
 // ---------- Subtítulos / conversación ----------
 const captionsEl = $('captions');
@@ -246,6 +271,7 @@ $('btnConnect').onclick = async () => {
     dc.onmessage = (e) => handleEvent(e.data);
 
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (pttActive()) setMic(false);   // pulsar-para-hablar: mic apagado hasta mantener «Hablar»
     localStream.getAudioTracks().forEach(t => pc.addTrack(t, localStream));
 
     const offer = await pc.createOffer();
