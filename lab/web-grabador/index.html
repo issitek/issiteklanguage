@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>talkdrill — Grabación de frases (uso interno)</title>
-<meta name="description" content="Página estática para grabar las 30 frases del estudio de pronunciación talkdrill. Los audios no salen del dispositivo salvo que tú los exportes.">
+<title>Grabación de frases</title>
+<meta name="description" content="Graba las 30 frases de calibración de pronunciación. Los audios no salen del dispositivo salvo que tú los exportes.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,14 +12,12 @@
 <!-- ===== Pantalla 1: consentimiento + código ===== -->
 <section id="screen-welcome" class="screen active">
   <div class="card">
-    <h1>🎙 Grabación de frases <span class="tag">talkdrill · uso interno</span></h1>
+    <h1>🎙 Grabación de frases</h1>
     <p class="lead">Gracias por ayudar. Vas a leer <strong>30 frases en inglés</strong>, una por una, aproximadamente <strong>4–6 minutos</strong>.</p>
 
     <div class="consent">
       <label class="check"><input type="checkbox" id="consent">
-        <span><strong>Quiero ayudar a calibrar</strong> este sistema interno de reconocimiento
-        de frases en inglés del proyecto talkdrill.</span></label>
-      <small class="consent-note">Tu grabación únicamente servirá para evaluar ese reconocimiento: no se publicará ni compartirá, y puedes pedir el borrado cuando quieras.</small>
+        <span><strong>Quiero ayudar a calibrar</strong> este sistema interno de reconocimiento de frases en inglés.</span></label>
     </div>
 
     <div class="code-box">
@@ -92,7 +90,7 @@
   </div>
 </section>
 
-<script src="codec.js"></script>
-<script src="app.js"></script>
+<script src="codec.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

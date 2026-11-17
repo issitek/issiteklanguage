@@ -43,11 +43,18 @@ const show = (id) => { for (const s of screens) $(s).classList.toggle('active', 
 /* Código de participante autogenerado (sin nombres, no se teclea) */
 const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'; // sin 0/o/1/l
 function genCode() {
-  const rand = new Uint32Array(6);
-  crypto.getRandomValues(rand);
-  let code = 's';
-  for (const r of rand) code += CODE_ALPHABET[r % CODE_ALPHABET.length];
-  return code;
+  try {
+    const rand = new Uint32Array(6);
+    crypto.getRandomValues(rand);
+    let code = 's';
+    for (const r of rand) code += CODE_ALPHABET[r % CODE_ALPHABET.length];
+    return code;
+  } catch {
+    // WebCrypto no disponible (contexto no seguro): Math.random basta para un id opaco
+    let code = 's';
+    for (let i = 0; i < 6; i++) code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+    return code;
+  }
 }
 
 const state = {
