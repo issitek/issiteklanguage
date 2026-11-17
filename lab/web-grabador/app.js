@@ -40,8 +40,18 @@ const $ = (id) => document.getElementById(id);
 const screens = ['screen-welcome', 'screen-record', 'screen-done'];
 const show = (id) => { for (const s of screens) $(s).classList.toggle('active', s === id); };
 
+/* Código de participante autogenerado (sin nombres, no se teclea) */
+const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'; // sin 0/o/1/l
+function genCode() {
+  const rand = new Uint32Array(6);
+  crypto.getRandomValues(rand);
+  let code = 's';
+  for (const r of rand) code += CODE_ALPHABET[r % CODE_ALPHABET.length];
+  return code;
+}
+
 const state = {
-  code: null,
+  code: genCode(),
   index: 0,
   items: new Map(),   // phraseId -> Uint8Array WAV
   recording: false,
@@ -54,23 +64,24 @@ const state = {
   timerInt: null,
 };
 
-/* ============ Pantalla 1: consentimiento + código ============ */
-const codeInput = $('code');
+/* ============ Pantalla 1: requisito de consentimiento ============ */
 const consentBox = $('consent');
 const startBtn = $('btnStart');
-const codeError = $('codeError');
-const CODE_RE = /^[a-z0-9_-]{2,32}$/;
 
-function refreshStart() {
-  const codeOk = CODE_RE.test(codeInput.value.trim());
-  startBtn.disabled = !(consentBox.checked && codeOk);
-  codeError.hidden = codeInput.value.trim().length === 0 || codeOk;
-}
-codeInput.addEventListener('input', refreshStart);
+$('autoCode').textContent = state.code;
+$('btnCopyCode').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(state.code);
+    $('btnCopyCode').textContent = '¡Copiado!';
+    setTimeout(() => { $('btnCopyCode').textContent = 'Copiar código'; }, 1500);
+  } catch { $('btnCopyCode').textContent = state.code; }
+});
+
+const refreshStart = () => { startBtn.disabled = !consentBox.checked; };
 consentBox.addEventListener('change', refreshStart);
+refreshStart();
 
 startBtn.addEventListener('click', () => {
-  state.code = codeInput.value.trim();
   state.index = 0;
   show('screen-record');
   loadPhrase();
