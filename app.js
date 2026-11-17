@@ -71,6 +71,63 @@ const state = {
   timerInt: null,
 };
 
+/* ============ Persistencia local (IndexedDB) — sobrevive a recargas ============ */
+const IDB_NAME = 'talkdrill';
+const IDB_VER = 1;
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VER);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('wavs')) db.createObjectStore('wavs', { keyPath: 'id' });
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+function idbPut(store, value) {
+  return idbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(value);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+function idbDelete(store, key) {
+  return idbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+function idbClear(store) {
+  return idbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  }));
+}
+function idbAllWavs() {
+  return idbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction('wavs', 'readonly');
+    const req = tx.objectStore('wavs').getAll();
+    req.onsuccess = (e) => resolve(e.target.result || []);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+function idbMeta(key) {
+  return idbOpen().then((db) => new Promise((resolve, reject) => {
+    const tx = db.transaction('meta', 'readonly');
+    const req = tx.objectStore('meta').get(key);
+    req.onsuccess = (e) => resolve(e.target.result ? e.target.result.value : null);
+    req.onerror = (e) => reject(e.target.error);
+  }));
+}
+
 /* ============ Pantalla 1: requisito de consentimiento ============ */
 const consentBox = $('consent');
 const startBtn = $('btnStart');
@@ -83,6 +140,31 @@ $('btnCopyCode').addEventListener('click', async () => {
     setTimeout(() => { $('btnCopyCode').textContent = 'Copiar código'; }, 1500);
   } catch { $('btnCopyCode').textContent = state.code; }
 });
+
+const resumeRow = $('resumeRow');
+const resumeCount = $('resumeCount');
+
+(async () => {
+  try {
+    const savedCode = await idbMeta('code');
+    if (savedCode) {
+      state.code = savedCode;
+      $('autoCode').textContent = savedCode;
+    } else {
+      await idbPut('meta', { key: 'code', value: state.code });
+    }
+    const saved = await idbAllWavs();
+    for (const it of saved) state.items.set(it.id, it.data);
+    if (saved.length > 0) {
+      const firstMissing = PHRASES.findIndex((p) => !state.items.has(p.id));
+      state.index = firstMissing === -1 ? 0 : firstMissing;
+      resumeRow.hidden = false;
+      resumeCount.textContent = String(saved.length);
+    }
+  } catch (err) {
+    console.warn('IndexedDB no disponible; avance no persistirá:', err);
+  }
+})();
 
 const refreshStart = () => { startBtn.disabled = !consentBox.checked; };
 consentBox.addEventListener('change', refreshStart);
@@ -171,6 +253,7 @@ function stopRecording() {
   const pcm16 = window.TalkCodec.downsampleLinear(merged, inRate, TARGET_RATE);
   const wav = window.TalkCodec.wavBytes(pcm16, TARGET_RATE);
   state.items.set(PHRASES[state.index].id, wav);
+  idbPut('wavs', { id: PHRASES[state.index].id, data: wav }).catch((e) => console.warn('no se pudo guardar localmente:', e));
   state.recording = false;
   state.chunks = [];
   $('recState').textContent = 'grabado ✓';
@@ -185,6 +268,7 @@ $('btnRecord').addEventListener('click', () => {
 $('btnRetry').addEventListener('click', () => {
   const id = PHRASES[state.index].id;
   state.items.delete(id);
+  idbDelete('wavs', id).catch(() => {});
   updateButtons();
   $('recState').textContent = 'listo (audio descartado)';
 });
@@ -252,6 +336,7 @@ $('btnSendEmail').addEventListener('click', async () => {
     sendStatus.className = 'send-status ok';
     sendStatus.textContent = '✅ ¡Recibido! Muchas gracias.';
     btn.textContent = '✔ Enviado';
+    idbClear('wavs').catch(() => {});
   } catch (err) {
     console.warn('envío directo falló:', err);
     sendStatus.className = 'send-status err';
@@ -312,3 +397,8 @@ if (btnMicPerm) {
   });
 }
 refreshMicPermUI();
+
+$('btnResetAll').addEventListener('click', async () => {
+  try { await idbClear('wavs'); await idbDelete('meta', 'code'); } catch {}
+  location.reload();
+});
