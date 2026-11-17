@@ -46,3 +46,8 @@ kbd { background: #33415e; border-radius: 4px; padding: .1rem .35rem; font-size:
 .export-block .btn { width: 100%; }
 code { background: #121a2e; border-radius: 4px; padding: .05rem .3rem; }
 @media (max-width: 480px) { .phrase { font-size: 1.2rem; } .row { flex-direction: column; } }
+.send-status { font-size:.85rem; margin:.35rem 0; min-height:1.2em; }
+.send-status.ok { color:#9fe8b0; }
+.send-status.err { color:#ff9c9c; }
+.send-status.info { color:#9db2ff; }
+.divider { border:0; border-top:1px solid var(--line); margin:.4rem 0 .2rem; }

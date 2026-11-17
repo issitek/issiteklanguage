@@ -266,3 +266,40 @@ if (window.showDirectoryPicker) {
     }
   });
 }
+
+/* ============ Envío directo al organizador (FormSubmit) ============ */
+const FORM_ENDPOINT = 'https://formsubmit.co/ajax/REEMPLAZAR-CON-ALIAS';
+const sendStatus = $('sendStatus');
+
+$('btnSendEmail').addEventListener('click', async () => {
+  const btn = $('btnSendEmail');
+  btn.disabled = true;
+  sendStatus.className = 'send-status info';
+  sendStatus.textContent = 'Preparando y enviando…';
+  try {
+    const zip = window.TalkCodec.zipBuild(entriesFor(state.code, state.items));
+    const file = new File([zip], `${state.code}.zip`, { type: 'application/zip' });
+    const fd = new FormData();
+    fd.append('attachment', file);
+    fd.append('_subject', `audios grabados (${state.code})`);
+    fd.append('_template', 'table');
+    fd.append('_captcha', 'false');
+    fd.append('code', state.code);
+    const r = await fetch(FORM_ENDPOINT, { method: 'POST', body: fd });
+    const txt = await r.text();
+    let ok = r.ok;
+    try {
+      const data = JSON.parse(txt);
+      ok = r.ok && (String(data?.success).toLowerCase() === 'true');
+    } catch { /* FormSubmit devolvió HTML; r.ok ya es señal suficiente */ }
+    if (!ok) throw new Error(`respuesta inesperada (${r.status}): ${txt.slice(0, 120)}`);
+    sendStatus.className = 'send-status ok';
+    sendStatus.textContent = '✅ ¡Recibido! Muchas gracias.';
+    btn.textContent = '✔ Enviado';
+  } catch (err) {
+    console.warn('envío directo falló:', err);
+    sendStatus.className = 'send-status err';
+    sendStatus.textContent = 'No se pudo enviar. Descarga el ZIP y envíalo como archivo.';
+    btn.disabled = false;
+  }
+});
