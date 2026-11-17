@@ -27,18 +27,22 @@
       <small>No necesitas anotarlo: irá dentro del archivo que descargues.</small>
     </div>
 
+    <div class="mic-permission" id="micPermWrap">
+      <button id="btnMicPermission" class="btn secondary" type="button">🎙 Dar permiso al micrófono</button>
+      <span id="micPermStatus" class="mic-status">Comprobando…</span>
+    </div>
+
     <div class="tips">
       <strong>Consejos rápidos</strong>
       <ul>
         <li>Cuarto silencioso y micrófono a 15–20 cm.</li>
         <li>Lee natural; nada de sobreactuar ni susurrar.</li>
         <li>Si te trabas, respira y pulsa <strong>↻ Reintentar</strong>.</li>
-        <li>Al terminar, usa «Descargar ZIP» o «Guardar en carpeta…» y envía el resultado según las instrucciones recibidas.</li>
       </ul>
     </div>
 
     <button id="btnStart" class="btn primary big" disabled>Comenzar (30 frases)</button>
-    <p class="privacy">🔒 Tus audios se quedan <strong>en este dispositivo</strong> hasta que tú decidas exportarlos. Nada se sube a ningún servidor.</p>
+    <p class="privacy">Tus audios solo se guardan si pulsas «Enviar» al final.</p>
   </div>
 </section>
 
@@ -72,28 +76,23 @@
   </div>
 </section>
 
-<!-- ===== Pantalla 3: final + exportación ===== -->
+<!-- ===== Pantalla 3: final ===== -->
 <section id="screen-done" class="screen">
   <div class="card">
     <h1>✅ ¡Listo!</h1>
-    <p class="lead">Grabaste las 30 frases como <strong id="doneCode">s01</strong>. Gracias por tu tiempo.</p>
+    <p class="lead">Grabaste las 30 frases con el código <strong id="doneCode">s01</strong>.
+    Cuando pulses «Enviar», tus audios llegan directo al servidor. Gracias por tu tiempo.</p>
 
     <div class="export-block">
-      <p class="export-title"><strong>¿Cómo entrego mis audios?</strong></p>
-      <button id="btnSendEmail" class="btn primary">📤 Enviar al organizador (por correo)</button>
+      <button id="btnSendEmail" class="btn primary big">📤 Enviar al organizador</button>
       <p id="sendStatus" class="send-status"></p>
-      <hr class="divider">
-      <button id="btnSaveDir" class="btn primary" hidden>📁 Guardar en carpeta…</button>
-      <button id="btnZip" class="btn primary">⬇ Descargar ZIP</button>
-      <button id="btnLoose" class="btn secondary">Descargar 30 audios sueltos</button>
-      <p class="hint">El botón «Enviar al organizador» hace que el ZIP llegue directo por correo (servicio externo FormSubmit). Si prefieres no usarlo, descarga el ZIP y envíalo como archivo por WhatsApp.</p>
     </div>
 
-    <p class="privacy">Si prefieres que NO se guarden las grabaciones, cierra esta página y avísanos: no se conserva nada en ningún sitio.</p>
+    <p class="privacy">Si el envío falla («No se pudo enviar»), cierra esta página y avísanos: no se conserva nada en ningún sitio.</p>
   </div>
 </section>
 
-<script src="codec.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="codec.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

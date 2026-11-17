@@ -51,3 +51,9 @@ code { background: #121a2e; border-radius: 4px; padding: .05rem .3rem; }
 .send-status.err { color:#ff9c9c; }
 .send-status.info { color:#9db2ff; }
 .divider { border:0; border-top:1px solid var(--line); margin:.4rem 0 .2rem; }
+.mic-permission { display:flex; align-items:center; gap:.7rem; background:#121a2e; border:1px solid var(--line); border-radius:10px; padding:.5rem .7rem; margin:.6rem 0; }
+.mic-permission .btn { white-space:nowrap; }
+.mic-status { font-size:.8rem; }
+.mic-ok { color:#9fe8b0; }
+.mic-warn { color:#ffd479; }
+.mic-pending { color:#9db2ff; }
