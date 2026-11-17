@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>talkdrill — Grabación de frases (uso interno)</title>
+<meta name="description" content="Página estática para grabar las 30 frases del estudio de pronunciación talkdrill. Los audios no salen del dispositivo salvo que tú los exportes.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== Pantalla 1: consentimiento + código ===== -->
+<section id="screen-welcome" class="screen active">
+  <div class="card">
+    <h1>🎙 Grabación de frases <span class="tag">talkdrill · uso interno</span></h1>
+    <p class="lead">Gracias por participar. Vas a leer <strong>30 frases en inglés</strong>, una por una, aproximadamente <strong>4–6 minutos</strong>.</p>
+
+    <div class="consent">
+      <label class="check"><input type="checkbox" id="consent">
+        <span><strong>Acepto</strong> que graben mi voz para calibrar y evaluar un sistema
+        interno de reconocimiento de pronunciación del proyecto talkdrill.
+        Las grabaciones <strong>no se publicarán</strong> ni se compartirán con terceros,
+        y puedo pedir su borrado en cualquier momento.</span></label>
+    </div>
+
+    <label class="field">
+      <span>Código de participante <em>(te lo asigna quien organiza; p. ej. s01)</em></span>
+      <input id="code" type="text" inputmode="latin" autocomplete="off" autocapitalize="none"
+             spellcheck="false" placeholder="s01" maxlength="32" pattern="[a-z0-9_-]{2,32}">
+      <small id="codeError" class="error" hidden>Usa 2–32 caracteres: minúsculas, números, «-» o «_».</small>
+    </label>
+
+    <div class="tips">
+      <strong>Consejos rápidos</strong>
+      <ul>
+        <li>Cuarto silencioso y micrófono a 15–20 cm.</li>
+        <li>Lee natural; nada de sobreactuar ni susurrar.</li>
+        <li>Si te trabas, respira y pulsa <strong>↻ Reintentar</strong>.</li>
+        <li>Al terminar, usa «Descargar ZIP» o «Guardar en carpeta…» y envía el resultado según las instrucciones recibidas.</li>
+      </ul>
+    </div>
+
+    <button id="btnStart" class="btn primary big" disabled>Comenzar (30 frases)</button>
+    <p class="privacy">🔒 Tus audios se quedan <strong>en este dispositivo</strong> hasta que tú decidas exportarlos. Nada se sube a ningún servidor.</p>
+  </div>
+</section>
+
+<!-- ===== Pantalla 2: grabación ===== -->
+<section id="screen-record" class="screen">
+  <div class="card">
+    <div class="progress-row">
+      <span id="progressLabel" class="progress-label">Frase 1 / 30</span>
+      <div class="progress"><div id="progressFill" class="progress-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="phrase-box">
+      <p id="phraseText" class="phrase">…</p>
+    </div>
+
+    <div class="rec-row">
+      <button id="btnRecord" class="btn record big">🎙 Grabar</button>
+      <div class="rec-status">
+        <span id="recTimer" class="timer">—</span>
+        <span id="recState" class="rec-state">listo</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <button id="btnPlay" class="btn secondary" disabled>▶ Escuchar mi frase</button>
+      <button id="btnRetry" class="btn secondary" disabled>↻ Reintentar</button>
+      <button id="btnNext" class="btn primary" disabled>Siguiente →</button>
+    </div>
+    <audio id="playback" hidden></audio>
+    <p class="hint">Pulsa <kbd>Espacio</kbd> para Grabar / Detener.</p>
+  </div>
+</section>
+
+<!-- ===== Pantalla 3: final + exportación ===== -->
+<section id="screen-done" class="screen">
+  <div class="card">
+    <h1>✅ ¡Listo!</h1>
+    <p class="lead">Grabaste las 30 frases como <strong id="doneCode">s01</strong>. Gracias por tu tiempo.</p>
+
+    <div class="export-block">
+      <p class="export-title"><strong>¿Cómo entrego mis audios?</strong></p>
+      <button id="btnSaveDir" class="btn primary" hidden>📁 Guardar en carpeta…</button>
+      <button id="btnZip" class="btn primary">⬇ Descargar ZIP</button>
+      <button id="btnLoose" class="btn secondary">Descargar 30 audios sueltos</button>
+      <p class="hint">Se descargará <code>s01.zip</code> con <code>s01/01.wav … 30.wav</code>. Envíalo como archivo (no como nota de voz).</p>
+    </div>
+
+    <p class="privacy">Si prefieres que NO se guarden las grabaciones, cierra esta página y avísanos: no se conserva nada en ningún sitio.</p>
+  </div>
+</section>
+
+<script src="codec.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

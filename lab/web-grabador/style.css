@@ -1,0 +1,47 @@
+/* talkdrill — grabador de frases · tema oscuro, botones grandes */
+:root { color-scheme: dark; --bg: #0f1420; --panel: #161d30; --line: #2b3654; --text: #e8ecf4; --muted: #9db2ff; --ok: #27a35c; --danger: #ff5252; --accent: #2b6cff; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 1rem; }
+.screen { display: none; width: 100%; max-width: 640px; }
+.screen.active { display: block; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 1.2rem 1.4rem; }
+h1 { font-size: 1.25rem; margin: .2rem 0 .6rem; }
+.tag { font-size: .65rem; vertical-align: middle; background: #33415e; border-radius: 999px; padding: .15rem .5rem; color: var(--muted); margin-left: .4rem; }
+.lead { color: #cdd6f4; }
+.consent { background: #121a2e; border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; margin: .6rem 0; font-size: .92rem; line-height: 1.4; }
+.check { display: flex; gap: .6rem; cursor: pointer; }
+.check input { margin-top: .2rem; transform: scale(1.2); }
+.field { display: block; margin: .7rem 0; }
+.field span { display: block; font-size: .85rem; color: var(--muted); margin-bottom: .3rem; }
+.field input { width: 100%; font-size: 1.6rem; padding: .45rem .7rem; background: #0f1420; border: 1px solid var(--line); border-radius: 8px; color: var(--text); letter-spacing: .08em; }
+.field input:focus { outline: 2px solid var(--accent); }
+.error { color: #ff9c9c; font-size: .8rem; }
+.tips { font-size: .85rem; color: #aeb9e0; }
+.tips ul { margin: .3rem 0 0; padding-left: 1.2rem; }
+.btn { border: 0; border-radius: 10px; padding: .6rem 1.1rem; font-size: 1rem; cursor: pointer; color: #fff; background: #33415e; }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn.primary { background: var(--accent); }
+.btn.secondary { background: #33415e; }
+.btn.big { font-size: 1.15rem; padding: .8rem 1.4rem; width: 100%; margin-top: .6rem; }
+.btn.record { background: var(--ok); min-width: 180px; }
+.btn.record.recording { background: var(--danger); }
+.privacy { font-size: .78rem; color: #8b96b8; margin-top: .8rem; }
+.progress-row { display: flex; align-items: center; gap: .7rem; margin-bottom: .4rem; }
+.progress-label { font-size: .8rem; color: var(--muted); white-space: nowrap; }
+.progress { flex: 1; height: .55rem; background: #121a2e; border-radius: 999px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #2b6cff, #27a35c); transition: width .3s; }
+.phrase-box { background: #121a2e; border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1rem; margin: .6rem 0; text-align: center; }
+.phrase { font-size: 1.55rem; line-height: 1.35; margin: 0; }
+.rec-row { display: flex; align-items: center; gap: .8rem; justify-content: center; margin: .6rem 0; }
+.rec-status { display: flex; flex-direction: column; align-items: center; min-width: 90px; }
+.timer { font-family: ui-monospace, monospace; font-size: 1.3rem; }
+.rec-state { font-size: .75rem; color: var(--muted); }
+.row { display: flex; gap: .5rem; justify-content: space-between; margin-top: .4rem; }
+.row .btn { flex: 1; }
+.hint { font-size: .75rem; color: #8b96b8; text-align: center; margin: .5rem 0 0; }
+kbd { background: #33415e; border-radius: 4px; padding: .1rem .35rem; font-size: .75rem; }
+.export-block { display: flex; flex-direction: column; gap: .5rem; background: #121a2e; border: 1px solid var(--line); border-radius: 12px; padding: .8rem; margin: .6rem 0; }
+.export-title { margin: 0 0 .2rem; color: #cdd6f4; }
+.export-block .btn { width: 100%; }
+code { background: #121a2e; border-radius: 4px; padding: .05rem .3rem; }
+@media (max-width: 480px) { .phrase { font-size: 1.2rem; } .row { flex-direction: column; } }

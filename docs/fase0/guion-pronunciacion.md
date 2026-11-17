@@ -9,6 +9,23 @@ El humo con Kokoro (98.39/100) **no** es evidencia de es-MX — este dataset sí
 Formato **WAV 16 kHz mono** (aunque graben a 44.1 kHz, se convierte en el análisis).
 Nombre de archivo: `<hablante>-<frase>.wav` — p. ej. `ana-12.wav`.
 
+## Cómo grabar (tres caminos)
+
+**PÁGINA WEB (recomendado):** `lab/web-grabador/` — página estática (GitHub Pages) donde el
+voluntario marca su consentimiento, escribe su código y graba las 30 frases con clics.
+Al final exporta un `sNN.zip` (o escribe a una carpeta) con `sNN/01.wav … 30.wav`,
+listo para `unzip -d …/audio/`. Ver `lab/web-grabador/README.md`.
+
+**pw-record (directo en esta máquina):**
+```bash
+mkdir -p …/audio/s01 && cd …/audio/s01
+pw-record --rate 16000 --channels 1 --format s16 s01-01.wav   # una frase, Ctrl+C corta
+```
+
+**Teléfono / grabadora:** cualquier app de notas de voz; luego convierte con
+`ffmpeg -ar 16000 -ac 1 -acodec pcm_s16le` y renombro a `<hablante>-<frase>.wav` (o entrega
+el `.zip` si usaron la página).
+
 ## Consentimiento (antes de grabar)
 
 1. Entregar hoja de **consentimiento** (`consentimiento-plantilla.md`); firmar o grabar
