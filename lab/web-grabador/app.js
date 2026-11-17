@@ -217,54 +217,12 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-/* ============ Pantalla 3: exportación ============ */
+/* ============ Envío al organizador (mismo origen) ============ */
 function entriesFor(code, items) {
   return [...items.entries()].map(([id, wav]) => ({
     name: `${code}/${String(id).padStart(2, '0')}.wav`,
     data: wav,
   }));
-}
-
-$('btnZip').addEventListener('click', () => {
-  const zip = window.TalkCodec.zipBuild(entriesFor(state.code, state.items));
-  const blob = new Blob([zip], { type: 'application/zip' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${state.code}.zip`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-});
-
-$('btnLoose').addEventListener('click', async () => {
-  for (const [id, wav] of state.items) {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
-    a.download = `${String(id).padStart(2, '0')}.wav`;
-    a.click();
-    await new Promise((r) => setTimeout(r, 120));
-  }
-});
-
-const btnSaveDir = $('btnSaveDir');
-if (window.showDirectoryPicker) {
-  btnSaveDir.hidden = false;
-  btnSaveDir.addEventListener('click', async () => {
-    try {
-      const parent = await window.showDirectoryPicker({ mode: 'readwrite' });
-      const dir = await parent.getDirectoryHandle(state.code, { create: true });
-      for (const [id, wav] of state.items) {
-        const name = `${String(id).padStart(2, '0')}.wav`;
-        const fh = await dir.getFileHandle(name, { create: true });
-        const w = await fh.createWritable();
-        await w.write(wav);
-        await w.close();
-      }
-      btnSaveDir.textContent = '✅ Guardado en la carpeta';
-      btnSaveDir.disabled = true;
-    } catch (err) {
-      if (err.name !== 'AbortError') alert('No se pudo guardar en la carpeta: ' + err.message);
-    }
-  });
 }
 
 /* ============ Envío directo al organizador (mismo origen) ============ */
@@ -297,7 +255,60 @@ $('btnSendEmail').addEventListener('click', async () => {
   } catch (err) {
     console.warn('envío directo falló:', err);
     sendStatus.className = 'send-status err';
-    sendStatus.textContent = 'No se pudo enviar. Usa «Descargar ZIP» y envíalo como archivo.';
+    sendStatus.textContent = 'No se pudo enviar. Cierra y avísanos para intentar de nuevo.';
     btn.disabled = false;
   }
 });
+
+/* ============ Re-solicitar permiso de micrófono ============ */
+const btnMicPerm = $('btnMicPermission');
+const micPermStatus = $('micPermStatus');
+
+async function micPermState() {
+  try {
+    const p = await navigator.permissions.query({ name: 'microphone' });
+    return p.state; // granted | denied | prompt
+  } catch {
+    return 'prompt'; // Permissions API no disponible: mostrar siempre el botón
+  }
+}
+
+async function refreshMicPermUI() {
+  if (!btnMicPerm) return;
+  const state = await micPermState();
+  if (state === 'granted') {
+    btnMicPerm.disabled = true;
+    btnMicPerm.textContent = '🎙 Micrófono listo ✓';
+    micPermStatus.textContent = 'Permiso concedido';
+    micPermStatus.className = 'mic-status mic-ok';
+  } else if (state === 'denied') {
+    btnMicPerm.disabled = false;
+    btnMicPerm.textContent = '🎙 Dar permiso al micrófono';
+    micPermStatus.textContent = 'Permiso denegado. Pulsa para volver a pedirlo.';
+    micPermStatus.className = 'mic-status mic-warn';
+  } else {
+    btnMicPerm.disabled = false;
+    btnMicPerm.textContent = '🎙 Dar permiso al micrófono';
+    micPermStatus.textContent = 'Pulsa para autorizar el micrófono';
+    micPermStatus.className = 'mic-status mic-pending';
+  }
+}
+
+if (btnMicPerm) {
+  btnMicPerm.addEventListener('click', async () => {
+    micPermStatus.textContent = 'Solicitando permiso…';
+    micPermStatus.className = 'mic-status mic-pending';
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+      micPermStatus.textContent = 'Permiso concedido ✓';
+      micPermStatus.className = 'mic-status mic-ok';
+      btnMicPerm.disabled = true;
+      btnMicPerm.textContent = '🎙 Micrófono listo ✓';
+    } catch {
+      micPermStatus.textContent = 'Sigue denegado. En la barra de direcciones: candado → Permisos → Micrófono → Permitir. Después pulsa de nuevo.';
+      micPermStatus.className = 'mic-status mic-warn';
+    }
+  });
+}
+refreshMicPermUI();
