@@ -57,3 +57,5 @@ code { background: #121a2e; border-radius: 4px; padding: .05rem .3rem; }
 .mic-ok { color:#9fe8b0; }
 .mic-warn { color:#ffd479; }
 .mic-pending { color:#9db2ff; }
+.resume-row { font-size:.8rem; color:#9db2ff; margin:.5rem 0 0; }
+.linklike { background:transparent; border:0; color:#ffb454; text-decoration:underline; cursor:pointer; padding:0; font-size:.8rem; }
