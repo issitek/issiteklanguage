@@ -13,8 +13,8 @@ y **falsos positivos**). Score ≥90 con Kokoro = humo técnico, no validación 
 | Bench automatizado | ✅ hecho | offline (`--network none` + `HF_HUB_OFFLINE=1`); tabla completa abajo; harness `lab/pronunciation/bench.py` |
 | Controles A/B/C/D | ✅ hecho | ver §2 |
 | Experimento proxy ES (ef_dora/em_alex) | ✅ hecho | §3: scores ~21–24 vs 96.6 nativo → uso sin modificar sería castigo generalizado; la señal favorece «modificar/recalibrar» |
-| P1 Grabaciones es-MX (8–12 hablantes) | ⬜ pendiente | guion `guion-pronunciacion.md` listo; audios fuera de git |
-| P2 Bench en frío/caliente | ✅ (Kokoro) | p50 1.61 s / p95 1.95 s por utterance; CLI cold ~28 s; primera síntesis de una frase nueva ~+17 s (kokoro offline) |
+| P1 Grabaciones es-MX (9 hablantes reales) | ✅ hecho (con incidencias) | 270 WAVs recibidos via web recorder y bajados de uploads/ del VPS; fuera de git; s06 = silencio absoluto (repetir) |
+| P2 Bench en frío/caliente | ✅ (Kokoro + 9 hablantes reales) | p50 1.61 s / p95 1.95 s por utterance; bench es-MX 270/270 evaluados; tabla completa abajo |
 | P3 Calibración vs etiquetas | ⬜ pendiente | requiere P1 + 2 jueces; umbrales propuestos: adoptar precision≥0.70 y recall≥0.80, **FPR≤0.25** (a confirmar con los datos) |
 | P4 Informe go/no-go de adopción | ⬜ pendiente | decisión adoptar/modificar/descartar |
 | P5 Maestro+backlog (solo si adoptar/modificar) | ⬜ condicional | DOCUMENTO_MAESTRO 1.0→1.1 |
@@ -105,6 +105,27 @@ de Fase 0b sigue abierto.
   directa en `services/pronunciation` (una carga de modelos + peticiones en caliente).
 - La red de seguridad técnica está lista para P3; la **decisión de adopción** sigue
   bloqueada por las grabaciones es-MX y las etiquetas humanas (P1).
+
+
+## 6. Bench sobre 9 hablantes reales (2026-11-18)
+
+| Hablante | Score mean | PER | WER | Errores flaggeados | Nota |
+|---|---|---|---|---|---|
+| s02 saw3m5w | 76.86 | 0.13 | 0.13 | 8 | audio estable, buen desempeño |
+| s01 s4ytvdu | 72.24 | 0.20 | 0.23 | 16 | audio estable |
+| s04 smwbmvr | 69.75 | 0.22 | 0.24 | 15 | audio estable |
+| s03 scgmrmf | 68.91 | 0.19 | 0.23 | 12 | audio estable |
+| s05 srd6p8h | 52.47 | 0.30 | 0.43 | 25 | señal baja (RMS 110) |
+| s07 swe7hwq | 50.96 | 0.37 | 0.45 | 37 | volumen medio-bajo |
+| s08 sx29h8t | 46.99 | 0.32 | 0.48 | 30 | señal media-baja |
+| s09 szem96e | 22.16 | 0.66 | 0.78 | 96 | señal muy baja (RMS 415) |
+| s06 styrwam | **0.00** | **1.00** | **1.00** | **200** | **silencio absoluto** — repetir grabación |
+
+- 270/270 enrolado evaluados. **Media global 51.15** vs 96.59 para Kokoro nativo (techo ilustrativo).
+- Normalización a −1 dBFS no cambia la clasificación; NO es problema de ganancia.
+- **3 variantes problemáticas** de adquisición: s06 (silencio), s05 y s09 (muy bajo volumen); la calidad mecánica diluye la señal.
+- **Interpretación provisional**: lectura no-estadística de que los evaluadores actuales castigan fuertemente el inglés mexicano de nativos; ninguno de los 9 está en el rango "bien pronunciado".
+- Conclusión previa:OpenPronounce requiere recalibración o excepciones de tolerancia antes de usarse tal cual.
 
 ## 5. Lo que NO se puede afirmar aún
 
