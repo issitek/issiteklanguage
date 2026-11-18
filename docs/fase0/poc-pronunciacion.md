@@ -13,8 +13,8 @@ y **falsos positivos**). Score ≥90 con Kokoro = humo técnico, no validación 
 | Bench automatizado | ✅ hecho | offline (`--network none` + `HF_HUB_OFFLINE=1`); tabla completa abajo; harness `lab/pronunciation/bench.py` |
 | Controles A/B/C/D | ✅ hecho | ver §2 |
 | Experimento proxy ES (ef_dora/em_alex) | ✅ hecho | §3: scores ~21–24 vs 96.6 nativo → uso sin modificar sería castigo generalizado; la señal favorece «modificar/recalibrar» |
-| P1 Grabaciones es-MX (9 hablantes reales) | ✅ hecho (con incidencias) | 270 WAVs recibidos via web recorder y bajados de uploads/ del VPS; fuera de git; s06 = silencio absoluto (repetir) |
-| P2 Bench en frío/caliente | ✅ (Kokoro + 9 hablantes reales) | p50 1.61 s / p95 1.95 s por utterance; bench es-MX 270/270 evaluados; tabla completa abajo |
+| P1 Grabaciones es-MX (10 hablantes reales) | ✅ hecho (con incidencias) | 300 WAVs recibidos via web recorder y bajados del VPS; fuera de git; s06 = silencio absoluto (repetir); nulo de ganancia en sgtmd2g (RMS 130, pico ~1700, escala abierta) |
+| P2 Bench en frío/caliente | ✅ (Kokoro + 9 hablantes reales) | p50 1.61 s / p95 1.95 s por utterance; bench es-MX 270/270 evaluados + rerun con 300/300 (incluye sgtmd2g); tabla completa abajo |
 | P3 Calibración vs etiquetas | ⬜ pendiente | requiere P1 + 2 jueces; umbrales propuestos: adoptar precision≥0.70 y recall≥0.80, **FPR≤0.25** (a confirmar con los datos) |
 | P4 Informe go/no-go de adopción | ⬜ pendiente | decisión adoptar/modificar/descartar |
 | P5 Maestro+backlog (solo si adoptar/modificar) | ⬜ condicional | DOCUMENTO_MAESTRO 1.0→1.1 |
