@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>talkdrill — evaluación de palabras</title>
+<link rel="stylesheet" href="/juez/style.css">
+</head><body>
+
+<!-- ===== Pantalla 1: bienvenida ===== -->
+<section id="screen-welcome" class="screen active">
+  <div class="card">
+    <h1>talkdrill — sesión de evaluación <span class="judgetag" id="judgeTag">JUEZ</span></h1>
+    <p class="lead">Vas a marcar la <strong>calidad</strong> de la pronunciación de <strong><span id="totalItems"></span></strong> palabras en inglés pronunciadas por mexicanos.
+      Cada palabra se escuchará como la dijo el hablante; decide si es:</p>
+    <div class="consent">
+      <p><strong>✓ ok</strong> — bien pronunciada (el modelo estaba equivocado)</p>
+      <p><strong>⚠ mejorable</strong> — se entiende pero con tropiezo fonético claro</p>
+      <p><strong>✗ mal</strong> — error claro de fonema o imposible de entender</p>
+      <p><strong>— no aplica</strong> — audio sin señal/ruido para calificar</p>
+      <p class="small">Sé estricto: si el fonema no es reconocible, es <strong>mal</strong>. Si el modelo marcó algo y usted oye bien, es <strong>ok</strong>.
+        Su criterio es la verdad para esta evaluación.</p>
+    </div>
+    <p class="small">Progreso guardado en este navegador; puedes salir y continuar. Asegúrate de no saltar pasos ni juzgar de memoria.</p>
+    <button class="btn primary" id="btnStart" style="width:100%; font-size:1.1rem; margin-top:.4rem">Empezar evaluación →</button>
+  </div>
+</section>
+
+<!-- ===== Pantalla 2: tarea ===== -->
+<section id="screen-task" class="screen">
+  <div class="card">
+    <div class="row" style="margin-bottom:.3rem">
+      <span class="small">hablante <b id="speakerTag"></b></span>
+      <span class="small" id="fileTag"></span>
+    </div>
+    <p class="phrase-label">Frase completa</p>
+    <p class="phrase-text" id="phraseText">…</p>
+
+    <div class="audio-row">
+      <audio id="audio" controls preload="auto"></audio>
+    </div>
+
+    <div class="phones">
+      <div>esperado: <b id="phonesExpected"></b></div>
+      <div>transcrito: <b id="phonesActual"></b></div>
+    </div>
+    <div class="small" id="confText">confianza: —</div>
+    <div class="progress-wrap"><div class="progress-fill" id="confBar" style="width:0%"></div></div>
+
+    <div class="verdict-row">
+      <button class="verdict ok" data-v="ok">✓ ok</button>
+      <button class="verdict mejorable" data-v="mejorable">⚠ mejorable</button>
+      <button class="verdict mal" data-v="mal">✗ mal</button>
+      <button class="verdict na" data-v="no-aplica">— no aplica</button>
+    </div>
+
+    <label class="small" for="notes">Nota opcional (opcional)</label>
+    <textarea id="notes" class="notes" rows="2" placeholder="p. ej. 'el hablante dudó pero la frase es clara'"></textarea>
+
+    <div class="progress-wrap"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <p class="small" id="progressLabel">Palabra 1 / 239</p>
+
+    <div class="row">
+      <button class="btn" id="btnPrev">← Atrás</button>
+      <button class="btn primary" id="btnNext">Siguiente →</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Pantalla 3: finalizar ===== -->
+<section id="screen-done" class="screen">
+  <div class="card">
+    <h1>✅ ¡Listo!</h1>
+    <p class="lead">Has evaluado <strong id="doneCount"></strong> de <span id="totalItems"></span> palabras. Cuando pulses «Enviar», tus resultados llegan al servidor del proyecto.</p>
+    <p class="small">Progreso guardado en este navegador. Después del envío, esta sesión queda cerrada para tu seguridad (tus veredictos ya no se conservan aquí).</p>
+    <button class="btn primary" id="btnSend" style="width:100%; font-size:1.05rem">📤 Enviar al organizador</button>
+    <p class="small" id="sendStatus" style="margin-top:.6rem">—</p>
+  </div>
+</section>
+
+<script src="/juez/app.js"></script>
+</body></html>
