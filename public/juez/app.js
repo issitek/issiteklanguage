@@ -7,6 +7,7 @@ const state = {
   verdicts: {},    // key → verdict string
   notes: {},       // key → nota
   judge: null,
+  seq: 0,          // marca monotónica de guardado (server-side ordering)
 };
 
 const $ = (id) => document.getElementById(id);
@@ -14,25 +15,129 @@ const show = (id) => {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
 };
 
+function clampIndex(i) {
+  return Math.min(Math.max(0, i | 0), Math.max(0, state.rows.length - 1));
+}
+
+function notice(text, color) {
+  const card = document.querySelector('#screen-welcome .card');
+  if (!card) return;
+  let el = $('serverNotice');
+  if (!el) {
+    el = document.createElement('p');
+    el.id = 'serverNotice';
+    el.className = 'small';
+    el.style.fontWeight = '600';
+    card.appendChild(el);
+  }
+  el.style.color = color || '#9fe8b0';
+  el.textContent = text;
+}
+
+/* Indicador visible de guardado (abajo a la derecha) */
+function setSaveStatus(text, color) {
+  let el = $('saveStatus');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'saveStatus';
+    el.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99;font:600 11px/1.3 system-ui,sans-serif;' +
+      'padding:4px 8px;border-radius:8px;background:#0b1220cc;border:1px solid #2b3654;pointer-events:none;';
+    document.body.appendChild(el);
+  }
+  el.style.color = color || '#9fe8b0';
+  el.textContent = text;
+}
+
+/* Progreso guardado por versiones anteriores en este navegador (migración) */
+function localBackup(judge) {
+  try {
+    const raw = localStorage.getItem(`talkdrill-judge-state-${judge}`);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    if (d && (Number(d.index) > 0 || Object.keys(d.verdicts || {}).length > 0)) return d;
+  } catch (e) { /* ignora */ }
+  return null;
+}
+
+async function postProgress(payload) {
+  const r = await fetch('/juez/progress', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+    keepalive: true,
+    cache: 'no-store',
+  });
+  if (r.status === 401) {
+    notice('⚠ Sesión no autenticada: cierra y vuelve a abrir el enlace (o recarga con Ctrl+F5).', '#ffb4b4');
+    setSaveStatus('sin sesión', '#ffb4b4');
+    throw new Error('401');
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json().catch(() => ({}));
+}
+
+function applyServerState(s) {
+  if (!s) return;
+  state.index = clampIndex(s.index | 0);
+  state.verdicts = s.verdicts || state.verdicts;
+  state.notes = s.notes || state.notes;
+  state.seq = s.seq || state.seq;
+}
+
+function renderCurrentIfVisible() {
+  const task = document.getElementById('screen-task');
+  if (task && task.classList.contains('active') && state.rows.length) renderItem();
+}
+
+/* Guardados serializados: nunca llegan desordenados al servidor */
+let saveChain = Promise.resolve();
 function saveProgress() {
   if (!state.judge) return;
-  state.seq = (state.seq || 0) + 1;
-  // fire-and-forget CON keepalive: aunque se cierre la pestaña al instante, llega
-  fetch('/juez/progress', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({index: state.index, verdicts: state.verdicts, notes: state.notes, seq: state.seq}),
-    keepalive: true,
-  }).catch((e) => console.warn('no se pudo guardar progreso:', e));
+  const seq = (state.seq || 0) + 1;  // avanza desde el seq del servidor
+  state.seq = seq;
+  const payload = {index: state.index, verdicts: state.verdicts, notes: state.notes, seq};
+  setSaveStatus('guardando…', '#ffd479');
+  saveChain = saveChain.then(async () => {
+    try {
+      const d = await postProgress(payload);
+      if (d.applied === false && d.server) {
+        // otro dispositivo guardó después: gana el más reciente, no pisamos con datos viejos
+        applyServerState(d.server);
+        notice('↩ Otro dispositivo avanzó: se cargó el avance más reciente del servidor.', '#ffd479');
+        renderCurrentIfVisible();
+        setSaveStatus('avance del servidor cargado', '#ffd479');
+        return;
+      }
+      const t = new Date().toLocaleTimeString();
+      setSaveStatus(`guardado ✓ ${t}`);
+    } catch (e) {
+      if (String(e && e.message) !== '401') setSaveStatus('no se pudo guardar', '#ffb4b4');
+    }
+  });
 }
 function queueSave() { saveProgress(); }  // guardado inmediato, sin retardo
 // Red de seguridad: si el navegador se cierra/va a segundo plano, vuelve a enviar
 window.addEventListener('pagehide', saveProgress);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveProgress(); });
+// Si el navegador restaura la página desde la caché de atrás/adelante, el JS no se
+// vuelve a ejecutar: releer el avance del servidor para no mostrar estado viejo.
+window.addEventListener('pageshow', async (e) => {
+  if (!e.persisted || !state.judge) return;
+  try {
+    const r = await fetch('/juez/progress', {cache: 'no-store'});
+    if (!r.ok) return;
+    const s = await r.json();
+    applyServerState(s);
+    renderCurrentIfVisible();
+    if (state.index > 0) {
+      notice(`↩ Avance actualizado del servidor: evaluación ${state.index + 1} de ${state.rows.length}.`);
+    }
+  } catch (err) { /* ignora */ }
+});
 
 async function init() {
   try {
-    const r = await fetch('/juez/role');
+    const r = await fetch('/juez/role', {cache: 'no-store'});
     if (r.status === 401) throw new Error('sin autenticación');
     const d = await r.json();
     state.judge = d.judge;
@@ -41,28 +146,50 @@ async function init() {
     return;
   }
   $('judgeTag').textContent = state.judge ? state.judge.toUpperCase() : 'JUEZ';
-  const sheet = await fetch('/juez/sheet.json').then(r => r.json());
+  const sheet = await fetch('/juez/sheet.json', {cache: 'no-store'}).then(r => r.json());
   state.rows = sheet.map(r => ({ ...r, key: `${r.file}:${r.word}` }));
-  // restaurar progreso del servidor (SQLite) — sin importar el dispositivo
+
+  // ---- restaurar progreso del servidor (SQLite) — sin importar el dispositivo ----
+  let saved = null;
   try {
-    const resp = await fetch('/juez/progress');
-    if (resp.ok) {
-      const saved = await resp.json();
-      state.index = Math.min(Math.max(0, saved.index | 0), state.rows.length - 1);
-      state.verdicts = saved.verdicts || {};
-      state.notes = saved.notes || {};
-      state.seq = saved.seq || 0;
-      console.log('progreso servidor: índice', saved.index, 'seq', state.seq);
-      if (saved.index > 0) {
-        const tag = $('resumeBanner') || document.createElement('p');
-        tag.id = 'resumeBanner';
-        tag.className = 'small';
-        tag.style.color = '#9fe8b0';
-        tag.textContent = `↩ Avance recuperado: ibas en la evaluación ${saved.index + 1} de ${state.rows.length}`;
-        document.querySelector('#screen-welcome .card').appendChild(tag);
-      }
+    const resp = await fetch('/juez/progress', {cache: 'no-store'});
+    if (resp.status === 401) {
+      notice('⚠ No pude leer tu avance: la sesión no está autenticada. Recarga con Ctrl+F5 o vuelve a abrir el enlace.', '#ffb4b4');
+    } else if (resp.ok) {
+      saved = await resp.json();
     }
-  } catch (e) { console.warn('no se pudo leer progreso del servidor:', e); }
+  } catch (e) {
+    notice('⚠ No pude leer tu avance del servidor (red). Al moverte se reintentará el guardado.', '#ffd479');
+  }
+  if (saved) {
+    state.index = clampIndex(saved.index | 0);
+    state.verdicts = saved.verdicts || {};
+    state.notes = saved.notes || {};
+    state.seq = saved.seq || 0;
+  }
+
+  // ---- migración desde versiones anteriores: fusiona (sin pisar) lo que haya en este navegador ----
+  let imported = 0;
+  const local = localBackup(state.judge);
+  if (local) {
+    for (const [k, v] of Object.entries(local.verdicts || {})) {
+      if (!state.verdicts[k]) { state.verdicts[k] = v; imported += 1; }
+    }
+    for (const [k, v] of Object.entries(local.notes || {})) {
+      if (!state.notes[k]) state.notes[k] = v;
+    }
+    const localIndex = clampIndex(local.index | 0);
+    const advanced = localIndex > state.index;
+    if (advanced) state.index = localIndex;
+    if (imported > 0 || advanced) {
+      saveProgress();  // sube al servidor el avance del navegador
+    }
+  }
+
+  if (state.index > 0) {
+    const extra = imported > 0 ? ` (${imported} veredictos recuperados de este navegador)` : '';
+    notice(`↩ Avance recuperado: evaluación ${state.index + 1} de ${state.rows.length}${extra}.`);
+  }
   $('totalItems').textContent = state.rows.length;
   show('screen-welcome');
 }
@@ -155,8 +282,15 @@ $('btnSend').addEventListener('click', async () => {
     if (!resp.ok) throw new Error(txt);
     $('sendStatus').textContent = '✅ Enviado. Gracias.';
     btn.textContent = '✔ Enviado';
-    await fetch('/juez/progress', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({index: 0, verdicts: {}, notes: {}, seq: (state.seq || 0) + 1})});
+    // cerrar la sesión también en el servidor (con un seq estrictamente mayor al actual)
+    try {
+      const srv = await fetch('/juez/progress', {cache: 'no-store'}).then(r => r.ok ? r.json() : null).catch(() => null);
+      state.seq = Math.max(state.seq || 0, (srv && srv.seq) || 0) + 1;
+      await postProgress({index: 0, verdicts: {}, notes: {}, seq: state.seq});
+    } catch (e) { /* el envío ya se hizo; el organizador puede reiniciar */ }
+    state.verdicts = {};
+    state.notes = {};
+    try { localStorage.removeItem(`talkdrill-judge-state-${state.judge}`); } catch (e) { /* ignora */ }
   } catch (err) {
     btn.disabled = false;
     $('sendStatus').textContent = 'No se pudo enviar. Intenta de nuevo o avísale al organizador.';
