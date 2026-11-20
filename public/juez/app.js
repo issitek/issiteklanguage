@@ -14,7 +14,21 @@ const show = (id) => {
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
 };
 
-const STORAGE_KEY = 'talkdrill-judge-state';
+function saveProgress() {
+  if (!state.judge) return;
+  state.seq = (state.seq || 0) + 1;
+  // fire-and-forget CON keepalive: aunque se cierre la pestaña al instante, llega
+  fetch('/juez/progress', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({index: state.index, verdicts: state.verdicts, notes: state.notes, seq: state.seq}),
+    keepalive: true,
+  }).catch((e) => console.warn('no se pudo guardar progreso:', e));
+}
+function queueSave() { saveProgress(); }  // guardado inmediato, sin retardo
+// Red de seguridad: si el navegador se cierra/va a segundo plano, vuelve a enviar
+window.addEventListener('pagehide', saveProgress);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveProgress(); });
 
 async function init() {
   try {
@@ -29,21 +43,28 @@ async function init() {
   $('judgeTag').textContent = state.judge ? state.judge.toUpperCase() : 'JUEZ';
   const sheet = await fetch('/juez/sheet.json').then(r => r.json());
   state.rows = sheet.map(r => ({ ...r, key: `${r.file}:${r.word}` }));
-  // restaurar progreso previo del mismo juez
-  const saved = JSON.parse(localStorage.getItem(`${STORAGE_KEY}-${state.judge}`) || 'null');
-  if (saved) {
-    state.index = Math.min(Math.max(0, saved.index | 0), state.rows.length - 1);
-    state.verdicts = saved.verdicts || {};
-    state.notes = saved.notes || {};
-  }
+  // restaurar progreso del servidor (SQLite) — sin importar el dispositivo
+  try {
+    const resp = await fetch('/juez/progress');
+    if (resp.ok) {
+      const saved = await resp.json();
+      state.index = Math.min(Math.max(0, saved.index | 0), state.rows.length - 1);
+      state.verdicts = saved.verdicts || {};
+      state.notes = saved.notes || {};
+      state.seq = saved.seq || 0;
+      console.log('progreso servidor: índice', saved.index, 'seq', state.seq);
+      if (saved.index > 0) {
+        const tag = $('resumeBanner') || document.createElement('p');
+        tag.id = 'resumeBanner';
+        tag.className = 'small';
+        tag.style.color = '#9fe8b0';
+        tag.textContent = `↩ Avance recuperado: ibas en la evaluación ${saved.index + 1} de ${state.rows.length}`;
+        document.querySelector('#screen-welcome .card').appendChild(tag);
+      }
+    }
+  } catch (e) { console.warn('no se pudo leer progreso del servidor:', e); }
   $('totalItems').textContent = state.rows.length;
   show('screen-welcome');
-}
-
-function saveLocal() {
-  localStorage.setItem(`${STORAGE_KEY}-${state.judge}`, JSON.stringify({
-    index: state.index, verdicts: state.verdicts, notes: state.notes,
-  }));
 }
 
 function current() {
@@ -82,7 +103,7 @@ function renderItem() {
 
 function commitVerdict(v) {
   state.verdicts[current().key] = v;
-  saveLocal();
+  queueSave();
   document.querySelectorAll('.verdict').forEach(b => b.classList.toggle('primary', b.dataset.v === v));
 }
 
@@ -91,7 +112,7 @@ document.querySelectorAll('.verdict').forEach(b => {
 });
 $('notes').addEventListener('input', e => {
   state.notes[current().key] = e.target.value;
-  saveLocal();
+  queueSave();
 });
 
 $('btnStart').addEventListener('click', () => {
@@ -99,11 +120,11 @@ $('btnStart').addEventListener('click', () => {
   renderItem();
 });
 $('btnPrev').addEventListener('click', () => {
-  if (state.index > 0) { state.index -= 1; saveLocal(); show('screen-task'); renderItem(); }
+  if (state.index > 0) { state.index -= 1; queueSave(); show('screen-task'); renderItem(); }
 });
 $('btnNext').addEventListener('click', () => {
   if (state.index < state.rows.length - 1) {
-    state.index += 1; saveLocal(); show('screen-task'); renderItem();
+    state.index += 1; queueSave(); show('screen-task'); renderItem();
   } else {
     show('screen-done');
     $('doneCount').textContent = Object.keys(state.verdicts).length;
@@ -134,7 +155,8 @@ $('btnSend').addEventListener('click', async () => {
     if (!resp.ok) throw new Error(txt);
     $('sendStatus').textContent = '✅ Enviado. Gracias.';
     btn.textContent = '✔ Enviado';
-    localStorage.removeItem(`${STORAGE_KEY}-${state.judge}`);
+    await fetch('/juez/progress', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({index: 0, verdicts: {}, notes: {}, seq: (state.seq || 0) + 1})});
   } catch (err) {
     btn.disabled = false;
     $('sendStatus').textContent = 'No se pudo enviar. Intenta de nuevo o avísale al organizador.';
