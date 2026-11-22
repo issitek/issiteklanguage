@@ -1,9 +1,10 @@
-# talkdrill.com — Backlog técnico
+# Issitek Language (talkdrill.com) — Backlog técnico
 
 | Campo | Valor |
 |---|---|
-| Versión | 1.0 |
-| Fecha | 2026-11-15 |
+| Producto | **Issitek Language** (dominio **talkdrill.com**) |
+| Versión | 1.1 |
+| Fecha | 2026-11-21 |
 | Complementa a | `DOCUMENTO_MAESTRO.md` |
 | Idioma | Español (México) |
 
@@ -15,21 +16,25 @@
 - **Estimación:** días-hombre aproximados para 1 desarrollador (no cuenta diseño ni QA).
 - **Dependencias:** IDs que deben estar completados antes de empezar.
 - **CA:** criterios de aceptación verificables.
-- La **Fase 0 es bloqueante**: ninguna tarea de fases 1+ se asigna a desarrollo
-  hasta cerrar `TD-F0-020` (informe go/no-go).
+- La **Fase 0 (voz) es bloqueante** y ya está aprobada (`docs/LABORATORIO_FASE0.md`).
+- La **Fase 0b (evaluación fonética) NO es bloqueante**: corre en paralelo y su
+  resultado solo decide **cuándo se habilita** el puntaje de pronunciación
+  (gate §13.5 del maestro).
 - **DoD global:** ver §18 del documento maestro (tests, contratos al día, telemetría, sin secretos).
 
 ### Resumen de fases
 
-| Fase | Alcance | Duración estimada |
-|---|---|---|
-| 0 | Laboratorio de validación (WebRTC→STT→LLM→TTS→RTP→visemas) | semana 0 (7–10 días) |
-| 1 | Fundamentos (repo, backend, DB, docker, señalización WebRTC mínima) | semanas 1–2 |
-| 2 | Motor de voz + IA con WebRTC (VAD/STT/TTS/AI Router/barge-in) | semanas 3–5 |
-| 3 | Profesor virtual 3D (VRM/Three.js/lip-sync) | semanas 6–8 |
-| 4 | Sistema educativo (cursos A1/A2, seguimiento, repetición espaciada) | semanas 9–11 |
-| 5 | Apps Capacitor + monetización (pagos, Admin, límites) | semanas 12–14 |
-| 6 | Pruebas, optimización y lanzamiento controlado | semanas 15–18 |
+| Orden | Fase | Alcance | Duración estimada |
+|---|---|---|---|
+| — | 0 | Laboratorio de voz (WebRTC→STT→LLM→TTS→RTP→visemas) | ✅ aprobada |
+| ∥ | 0b | Investigación fonética (juez 3, Set B, calibración, motores) | paralela |
+| 1 | 1 | Fundamentos + contrato del evaluador + voz/consentimiento + vertical slice | semanas 1–2 |
+| 2 | 4a | Núcleo educativo y práctica (lecciones, intentos, progreso, repaso) | semanas 3–5 |
+| 3 | 2 | Conversación (VAD/STT/TTS/AI Router/barge-in) | semanas 6–8 |
+| 4 | 3 | Profesor virtual 3D (VRM/Three.js/lip-sync) | semanas 9–11 |
+| 5 | 5a | Administración, apps y monetización | semanas 12–13 |
+| 6 | 5b | Integración del evaluador fonético validado | semanas 13–14 |
+| 7 | 6 | Pruebas, optimización y lanzamiento | semanas 15–18 |
 
 ---
 
@@ -63,9 +68,28 @@
 
 ---
 
+## Fase 0b — Evaluador fonético (investigación paralela, NO bloqueante)
+
+**Objetivo:** determinar con evidencia qué motor (si alguno) merece habilitar la
+evaluación de pronunciación como función de producto. **No bloquea F1–F6.**
+
+| ID | P | Est. | Dependencias | Tarea | CA |
+|---|---|---|---|---|---|
+| TD-F0b-001 | P0 | 0.5d | — | Respaldar etiquetas de jueces y construir la hoja ciega de discrepancias (144 filas: 140 discrepancias + 4 sin marcar) | `lab/data/pronunciation/labels/backup/` con md5; hoja servida solo a `juez3` |
+| TD-F0b-002 | P0 | 0.5d | TD-F0b-001 | Acceso `juez3` con Basic Auth independiente y modo ciego (sin score/confianza/IPA) | 401 con credencial incorrecta; juez3 no ve progreso de juez1/2 |
+| TD-F0b-003 | P0 | 1d | TD-F0b-001 | Conjunto B: 90 clips sintéticos (Kokoro `af_heart`, `es-dora`, `es-alex`) etiquetados por los 3 jueces con progreso por tarea | 90/90 etiquetados por cada juez; audio servido con auth |
+| TD-F0b-004 | P0 | 1.5d | TD-F0b-001…003 | Fusión y adjudicación: 3/3 directo · 2/3 mayoría · 3 distintos → experto; 4 clases + etiqueta binaria derivada | `labels-final.csv` (335 filas) con origen y observaciones; κ vs cada juez reportado |
+| TD-F0b-005 | P0 | 2d | TD-F0b-004 | Medir OpenPronounce sobre A y B con `--json-out`; precision/recall/FPR/AUC + IC95 bootstrap + desglose θ/ð/ɪ/ɹ | Tabla reproducible por script; sin números manuales |
+| TD-F0b-006 | P2 | 3d | TD-F0b-004 | Comparación de motores (Azure, Speechace, ELSA condicionado, GOP local) sobre Set B | Tabla comparativa + McNemar + latencia/costo; advertencia de validez (sintético vs real) |
+| TD-F0b-007 | P0 | 0.5d | TD-F0b-005…006 | Informe P4 y gate §13.5 del maestro | Decisión adoptar/modificar/descartar por motor; aprobada |
+
+---
+
 ## Fase 1 — Fundamentos (semanas 1–2)
 
-**Objetivo:** plataforma base funcional con conexión WebRTC mínima; sin producto educativo aún.
+**Objetivo:** plataforma base funcional y primera **vertical slice** educativa
+(login → curso A1 → lección → escuchar referencia → grabar → MinIO → intento → progreso),
+con evaluación fonética desactivada. La conversación WebRTC se construye en F2.
 
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
@@ -76,12 +100,14 @@
 | TD-F1-005 | P0 | 2d | TD-F1-003 | Esquema SQL (maestro §6) en Alembic: usuarios, suscripciones, perfiles, niveles, cursos/lecciones/ejercicios, vocabulario, grammar_topics, progreso, learning_events, conversation_sessions, conversation_messages, ice_telemetry, speech_assets, avatars, voice_profiles, ai_usage, model_registry | `alembic upgrade head` limpio; seeds mínimos (planes, voces Kokoro) |
 | TD-F1-006 | P0 | 2d | TD-F1-001 | Docker Compose dev all-in-one (nginx, api, worker, postgres, redis, minio, coturn **propio del proyecto**, puertos documentados libres) | `docker compose up` levanta todo; sin colisiones con puertos de proyectos existentes (lista en `infra/README.md`) |
 | TD-F1-007 | P0 | 2d | TD-F1-006 | Vue 3 + Vite + TS base: routing, layout, tema, auth (login/registro), `pages/home`, store (Pinia) | App corre en dev; login real contra API |
-| TD-F1-008 | P1 | 1d | TD-F1-007 | Pantalla de selección de profesor (avatar estático por ahora) + selección/creación de sesión | La sesión se crea en BD al pulsar "Empezar" |
-| TD-F1-009 | P0 | 2d | TD-F1-003, TD-F1-006 | **Señalización WebRTC en API**: `POST /conversation/sessions/{id}/webrtc/offer`, `POST .../webrtc/ice`, `WS .../signaling` (ICE trickle); cuaje de credenciales TURN HMAC (reuso del patrón mxerp,realm propio) | Offer→answer OK en navegador; ICE trickle por WS; credenciales ≤ 5 min; telemetría básica a `ice_telemetry` |
-| TD-F1-010 | P0 | 2d | TD-F1-009 | Voice Service aiortc **modo eco** integrado a la sesión: audio RTP de vuelta al cliente + DataChannel `events` abierto (mensajes de prueba) | Alumno oye su propia voz < 2 s; aparece "connected" vía DataChannel |
-| TD-F1-011 | P1 | 0.5d | TD-F1-010 | `POST /webrtc/ice-report` + `GET /webrtc/ice-report/recent` (admin) estilo mxerp | Cliente reporta candidateType/RTT; admin ve últimos N reportes |
-| TD-F1-012 | P1 | 1d | TD-F1-007 | Captura y reproducción de audio en cliente: worklets, `getUserMedia`, manejo de audífonos e interrupciones (ducking cuando hay llamada) | Audio claro; sin acople con audífonos; detecta pérdida de permiso mic |
 | TD-F1-013 | P2 | 0.5d | TD-F1-003 | OpenAPI snapshot + `packages/shared` con tipos TS de eventos DataChannel | `pnpm generate` actualiza tipos; CI valida que no hay drift |
+| TD-F1-014 | P0 | 1d | TD-F1-003 | Contrato `PronunciationEvaluator` (Protocol + modelos pydantic versionados) + `FakeEvaluator` (`status=disabled`) + contract tests | Contrato en `docs/fase1/contrato-evaluador.md`; JSON Schema `1.0`; tests cubren los 4 estados |
+| TD-F1-015 | P0 | 1d | TD-F1-005 | Migraciones de voz: `consents`, `exercise_attempts`, `tts_cache` + deltas de `pronunciation_attempts` y `speech_assets` | `alembic upgrade head` limpio; `downgrade` probado |
+| TD-F1-016 | P0 | 1d | TD-F1-006 | MinIO: buckets `reference-audio` y `student-recordings`; presign TTL 300 s; verificación SHA-256; retención | Subida firmada OK; hash verificado; URL vencida → 403 |
+| TD-F1-017 | P0 | 1d | TD-F1-003 | TTS de referencia: `GET /tts/reference` con caché `tts_cache` (Kokoro) + `GET /tts/voices` | Segundo request idéntico responde < 200 ms desde caché |
+| TD-F1-018 | P0 | 1d | TD-F1-016 | Grabación cliente con `MediaRecorder` (opus/wav): presign → PUT → complete; límites de duración/tamaño y reintentos | Grabación de 15 s sube y se reproduce; reintento tras fallo de red |
+| TD-F1-019 | P0 | 2d | TD-F1-004…018 | **Vertical slice**: login → curso A1 → lección → escuchar palabra (Kokoro) → grabar → MinIO → intento registrado → progreso; evaluación fonética desactivada | Recorrido E2E en navegador; `exercise_attempts` y `speech_assets` correctos; UI muestra «Práctica libre» sin puntaje |
+| TD-F1-020 | P1 | 1d | TD-F1-005 | Harness de contenido: JSON Schema de lección + seed de 10 lecciones A1 (borrador) + validación en CI | Seed carga sin errores; lección inválida falla con mensaje claro |
 
 ---
 
@@ -89,8 +115,15 @@
 
 **Objetivo:** conversación hablada funcional alumno↔profesor (sin avatar completo aún), sobre WebRTC desde el día 1.
 
+> **Heredados de F1 (reorden v1.1):** `TD-F1-008`…`TD-F1-012` conservan su ID y se ejecutan en esta fase, porque la conversación es su hogar natural. F1 ya no construye WebRTC.
+
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
+| TD-F1-008 | P1 | 1d | TD-F1-007 | Pantalla de selección de profesor (avatar estático por ahora) + selección/creación de sesión | La sesión se crea en BD al pulsar "Empezar" |
+| TD-F1-009 | P0 | 2d | TD-F1-003, TD-F1-006 | **Señalización WebRTC en API**: `POST /conversation/sessions/{id}/webrtc/offer`, `POST .../webrtc/ice`, `WS .../signaling` (ICE trickle); cuaje de credenciales TURN HMAC (reuso del patrón mxerp,realm propio) | Offer→answer OK en navegador; ICE trickle por WS; credenciales ≤ 5 min; telemetría básica a `ice_telemetry` |
+| TD-F1-010 | P0 | 2d | TD-F1-009 | Voice Service aiortc **modo eco** integrado a la sesión: audio RTP de vuelta al cliente + DataChannel `events` abierto (mensajes de prueba) | Alumno oye su propia voz < 2 s; aparece "connected" vía DataChannel |
+| TD-F1-011 | P1 | 0.5d | TD-F1-010 | `POST /webrtc/ice-report` + `GET /webrtc/ice-report/recent` (admin) estilo mxerp | Cliente reporta candidateType/RTT; admin ve últimos N reportes |
+| TD-F1-012 | P1 | 1d | TD-F1-007 | Captura y reproducción de audio en cliente: worklets, `getUserMedia`, manejo de audífonos e interrupciones (ducking cuando hay llamada) | Audio claro; sin acople con audífonos; detecta pérdida de permiso mic |
 | TD-F2-001 | P0 | 1d | TD-F1-010 | Pipeline aiortc: Opus→PCM 16 kHz mono→VAD→segmentación; integración con faster-whisper (contenedor/servicio P100; fallback CPU documentado) | Alumno→texto con < 1 s extra de latencia vs Whisper directo |
 | TD-F2-002 | P0 | 2d | TD-F2-001 | Integración AI Router (cliente HTTP a LLM local/externa según §8 maestro): timeouts, fallback ladder, JSON estructurado validado (pydantic), registro en `ai_usage` | Local sano → local; degradado → externa; JSON inválido → reintento 1 vez → error amigable sin romper sesión; **emociones normalizadas contra whitelist (p. ej. `encouraged`→`encouraging`) antes de emitirlas por DataChannel** |
 | TD-F2-003 | P0 | 1d | TD-F2-002 | Prompts pedagógicos del sistema (nivel CEFR, es-MX, porcentaje inglés por nivel, tipo de corrección); set de regresión TD-F0-019 | Set de prompts pasa ≥ 80% (reuso del laboratorio) |
@@ -125,28 +158,42 @@
 
 ---
 
-## Fase 4 — Sistema educativo (semanas 9–11)
+## Fase 4a — Núcleo educativo y práctica (semanas 3–5)
 
-**Objetivo:** producto educativo estructurado A1–A2 con memoria de estudiante.
+**Objetivo:** producto educativo estructurado A1–A2 con práctica, intentos y
+progreso, **sin** evaluación fonética ni corrección por IA.
 
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
-| TD-F4-001 | P0 | 1d | TD-F1-005 | Contenido A1 y A2: 8–10 lecciones/curso base, cada una con objetivos, vocabulario (lemma, pos, traducción, ejemplo), gramática, ejercicios | Seeds cargados; revisión pedagógica firmada por quien enseñe inglés en el equipo |
-| TD-F4-002 | P0 | 2d | TD-F4-001 | Lección player: presentar → ejercicio → feedback; tipos: elegir, traducir, escuchar, repetir (usa /pronunciation/evaluate) | Flujo completo usable en móvil |
-| TD-F4-003 | P1 | 1d | TD-F4-002 | Evaluación de nivel (placement): quiz hablado adaptativo A1→B1 con STT; determina CEFR inicial | Sitúa en A1/A2/B1 coherentemente (validar con 5 personas) |
-| TD-F4-004 | P0 | 2d | TD-F2-008 | **Memoria del estudiante**: perfil (weaknesses, mastery), tipado de error (grammar/pronunciation/vocabulary/comprehension/stt_attributable) automático post-turno | Tras 3 sesiones con errores past_simple repetidos, aparece en `weaknesses` |
-| TD-F4-005 | P0 | 1.5d | TD-F4-004 | Repetición espaciada SM-2 simplificado (vocabulario + gramática débil): cola en Redis + worker; "repasos pendientes" al iniciar sesión | Palabras dominadas salen de la cola; repaso programado visible |
-| TD-F4-006 | P1 | 2d | TD-F4-002 | Evaluación de pronunciación v1: subida/stream → STT + alineación (MFA o alternativa validada en Fase 0) + métricas + feedback accionable | Puntaje coherente en 20 muestras etiquetadas; feedback comprensible para A2 |
-| TD-F4-007 | P1 | 1d | TD-F4-004 | Estadísticas alumno: rachas, minutos, dominio por área, debilidades top-3, evolución semanal | `/statistics` responde < 300 ms; vista "progreso" en web |
-| TD-F4-008 | P1 | 1d | TD-F4-007 | Recomendador: próxima lección según nivel+debilidades+memoria | Recomienda coherentemente en casos de prueba |
-| TD-F4-009 | P2 | 1d | TD-F4-001 | Editor interno mínimo de lecciones (JSON + UI simple) para ajustar contenido sin deploy | Contenido editable y versionado en BD |
-| TD-F4-010 | P1 | 1d | TD-F4-003…008 | Integración educativa en la conversación: el orquestador inyecta debilidad actual y vocabulario en repaso al promt | Conversación referencia material real del alumno |
+| TD-F4-001 | P0 | 1d | TD-F1-005 | Contenido A1: 8–10 lecciones, con objetivos, vocabulario (lemma, pos, traducción, ejemplo), gramática y ejercicios | Seeds cargados; revisión pedagógica firmada |
+| TD-F4-002 | P0 | 2d | TD-F4-001 | Lección player: presentar → ejercicio → feedback; tipos: elegir, traducir, escuchar, repetir (sin puntaje fonético) | Flujo completo usable en móvil |
+| TD-F4-005 | P0 | 1.5d | TD-F4-002 | Repetición espaciada SM-2 simplificado (vocabulario + gramática débil): cola en Redis + worker | Palabras dominadas salen de la cola; repaso programado visible |
+| TD-F4-007 | P1 | 1d | TD-F4-002 | Estadísticas alumno: rachas, minutos, dominio por área, debilidades top-3, evolución semanal | `/statistics` < 300 ms; vista "progreso" en web |
+| TD-F4-008 | P1 | 1d | TD-F4-007 | Recomendador: próxima lección según nivel + debilidades | Recomienda coherentemente en casos de prueba |
+| TD-F4-009 | P2 | 1d | TD-F4-001 | Editor interno mínimo de lecciones (JSON + UI simple) | Contenido editable y versionado en BD |
+| TD-F4-011 | P0 | 1d | TD-F4-002 | Historial de intentos: `exercise_attempts` con reintentos, pistas usadas y tiempo | Historial por ejercicio y por lección; sobrevive a recarga |
+| TD-F4-012 | P0 | 1d | TD-F4-002 | Reglas de avance y estados de lección (`not_started` · `in_progress` · `completed`) + `student_progress` | Completar lección actualiza progreso y desbloquea la siguiente |
+| TD-F4-013 | P1 | 1d | TD-F4-001 | QA de contenido: checklist pedagógico y consistencia vocabulario↔ejercicios↔audio | 10/10 lecciones pasan checklist |
 
 ---
 
-## Fase 5 — Apps y monetización (semanas 12–14)
+## Fase 4b — Corrección contextual y memoria (semanas 6–8, tras F2)
 
-**Objetivo:** MVP multiplataforma comercializable.
+**Objetivo:** aprovechar la conversación para memoria del estudiante y
+corrección contextual.
+
+| ID | P | Est. | Dependencias | Tarea | CA |
+|---|---|---|---|---|---|
+| TD-F4-003 | P1 | 1d | TD-F4-002, TD-F2-001 | Evaluación de nivel (placement): quiz hablado adaptativo A1→B1 con STT | Sitúa en A1/A2/B1 coherentemente (validar con 5 personas) |
+| TD-F4-004 | P0 | 2d | TD-F2-008 | Memoria del estudiante: perfil (weaknesses, mastery), tipado de error (grammar/pronunciation/vocabulary/comprehension/stt_attributable) post-turno | Tras 3 sesiones con errores past_simple repetidos, aparece en `weaknesses` |
+| TD-F4-010 | P1 | 1d | TD-F4-003…008 | Integración educativa en la conversación: el orquestador inyecta debilidad actual y vocabulario en repaso al prompt | Conversación referencia material real del alumno |
+| TD-F4-014 | P1 | 1d | TD-F4-004 | Panel de debilidades del alumno (alumno y admin) con evolución | Visible y coherente con `learning_events` |
+
+---
+
+## Fase 5a — Apps, administración y monetización (semanas 12–13)
+
+**Objetivo:** MVP multiplataforma comercializable y operable.
 
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
@@ -161,6 +208,21 @@
 | TD-F5-009 | P1 | 1d | TD-F1-005 | Retención y consentimiento en producción: worker borra audio vencido; UI de borrado de historial; aviso de privacidad + aceptación | Tras cumplir `retention_until`, audios no existen en MinIO; ARCO request documentado |
 | TD-F5-010 | P1 | 1d | TD-F5-001, TD-F5-002 | Analítica mínima: activación (primera sesión completada), retención D1/D7/D30, minutos promedio, conversión free→paid | Eventos a BD/warehouse simple; dashboard SQL |
 | TD-F5-011 | P2 | 1d | TD-F5-008 | Rate limiting global + WAF básico (reglas nginx: tamaños, métodos, headers) | Fuzzing básico sin 5xx anómalos |
+
+---
+
+## Fase 5b — Integración del evaluador fonético (semanas 13–14)
+
+**Objetivo:** habilitar la evaluación de pronunciación **solo** si el motor
+superó el gate §13.5, con activación gradual por cohorte.
+
+| ID | P | Est. | Dependencias | Tarea | CA |
+|---|---|---|---|---|---|
+| TD-F5-012 | P0 | 1.5d | TD-F1-014, TD-F0b-007 | Adaptador del motor ganador (OpenPronounce/Azure/Speechace) tras el puerto `PronunciationEvaluator` | Contract tests pasan; mismo resultado normalizado que el motor de referencia |
+| TD-F5-013 | P0 | 1d | TD-F5-012 | Activación por cohorte con `PRONUNCIATION_EVAL_ENABLED` + `reliability` por motor | Flag off → `status=disabled`; flag on → puntaje solo con `reliability=validated` |
+| TD-F5-014 | P0 | 1.5d | TD-F5-012 | UI de retroalimentación fonética: palabra, fonema, ejemplo y reintento | Alumno entiende el error; sin puntaje crudo sin contexto |
+| TD-F5-015 | P1 | 1d | TD-F5-012 | Telemetría y costos del evaluador (`pronunciation_attempts`, `ai_usage`) | Latencia p95 y costo por 1k visibles en admin |
+| TD-F4-006 | P1 | 2d | TD-F5-012 | Evaluación de pronunciación v1 sobre ejercicios (evidencia + feedback accionable) | Puntaje coherente en 20 muestras etiquetadas; feedback comprensible para A2 |
 
 ---
 
@@ -186,19 +248,22 @@
 
 | Fase | Items | Días-hombre aprox. |
 |---|---|---|
-| 0 | 20 | 14–16 |
-| 1 | 13 | 16–17 |
-| 2 | 12 | 13–15 |
+| 0 (voz, aprobada) | 20 | 14–16 |
+| 0b (paralela) | 7 | 8–9 |
+| 1 | 15 | 17 |
+| 2 | 17 | 20–22 |
 | 3 | 10 | 11 |
-| 4 | 10 | 13–14 |
-| 5 | 11 | 17 |
+| 4a | 9 | 11–12 |
+| 4b | 4 | 5–6 |
+| 5a | 11 | 17 |
+| 5b | 5 | 7–8 |
 | 6 | 9 | 15–16 |
-| **Total** | **85** | **~99–102 días ≈ 20 semanas-persona** |
+| **Total** | **107** | **~125–134 días ≈ 25–27 semanas-persona** |
 
-Con 2 desarrolladores y diseño/QA de apoyo, ~100 días-hombre de desarrollo puro
-son coherentes con el calendario del documento maestro (Fase 0 previa de
-1–2 semanas + semanas 1–18). Los números son orientación de planificación,
-no compromiso; se reestimarán tras la Fase 0.
+Con 2 desarrolladores y diseño/QA de apoyo, ~125 días-hombre de desarrollo puro
+son coherentes con el calendario del documento maestro (Fase 0 de voz ya
+cerrada; Fase 0b en paralelo). Los números son orientación de planificación, no
+compromiso; se reestimarán al cierre de F1 (vertical slice).
 
 ## Fuera de alcance del MVP (fase posterior)
 
