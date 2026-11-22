@@ -1,104 +1,22 @@
+import type {
+  AttemptResult,
+  Consent,
+  Course,
+  Lesson,
+  LessonComplete,
+  Presign,
+  Progress,
+  Recording,
+  Token,
+  TtsReference,
+  User,
+} from "@issitek/shared";
+
+export type * from "@issitek/shared";
+
 const API_BASE = import.meta.env.VITE_API_BASE ?? "/api/v1";
 const ACCESS_KEY = "issitek.access";
 const REFRESH_KEY = "issitek.refresh";
-
-export interface User {
-  id: string;
-  email: string;
-  display_name: string;
-  role: string;
-  created_at: string;
-}
-
-export interface LessonSummary {
-  id: string;
-  slug: string;
-  title: string;
-  description: string;
-  position: number;
-}
-
-export interface Course {
-  id: string;
-  slug: string;
-  title: string;
-  level: string;
-  description: string;
-  lessons: LessonSummary[];
-}
-
-export interface Exercise {
-  id: string;
-  type: string;
-  prompt: string;
-  payload: Record<string, unknown>;
-  position: number;
-}
-
-export interface Lesson extends LessonSummary {
-  course_id: string;
-  exercises: Exercise[];
-}
-
-export interface AttemptResult {
-  id: string;
-  exercise_id: string;
-  attempt_no: number;
-  score: number | null;
-  is_correct: boolean | null;
-  created_at: string;
-  feedback?: string | null;
-}
-
-export interface ProgressItem {
-  lesson_id: string;
-  lesson_title: string;
-  status: string;
-  score: number | null;
-  attempts: number;
-  completed_at: string | null;
-}
-
-export interface Progress {
-  completed_lessons: number;
-  total_lessons: number;
-  attempts: number;
-  items: ProgressItem[];
-  pronunciation_eval_enabled: boolean;
-}
-
-export interface Consent {
-  kind: string;
-  version: string;
-  granted_at: string | null;
-  revoked_at: string | null;
-  active: boolean;
-}
-
-export interface TtsReference {
-  url: string;
-  duration_ms: number | null;
-  cached: boolean;
-  provider: string;
-  expires_in: number;
-}
-
-export interface Presign {
-  recording_id: string;
-  url: string;
-  method: string;
-  headers: Record<string, string>;
-  expires_in: number;
-}
-
-export interface Recording {
-  id: string;
-  url: string;
-  expires_in: number;
-  sha256: string | null;
-  duration_ms: number;
-  mime: string;
-}
 
 export class ApiError extends Error {
   status: number;
@@ -216,13 +134,13 @@ export function signedUrl(url: string): string {
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ access_token: string; refresh_token: string }>("/auth/login", {
+    request<Token>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   register: (email: string, password: string, display_name: string) =>
-    request<{ access_token: string; refresh_token: string }>("/auth/register", {
+    request<Token>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, display_name }),
     }),
@@ -246,10 +164,7 @@ export const api = {
     }),
 
   completeLesson: (lessonId: string) =>
-    request<{ lesson_id: string; status: string; completed_at: string }>(
-      `/lessons/${lessonId}/complete`,
-      { method: "POST" },
-    ),
+    request<LessonComplete>(`/lessons/${lessonId}/complete`, { method: "POST" }),
 
   progress: () => request<Progress>("/me/progress"),
 

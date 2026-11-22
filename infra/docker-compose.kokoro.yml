@@ -1,0 +1,27 @@
+# Overlay opcional: TTS real con Kokoro (CPU).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.kokoro.yml up -d --build
+#
+# La API pasa de `fake` a `kokoro` y apunta al servicio interno `tts:8880`.
+# El contenedor descarga el modelo la primera vez; requiere varios GB de RAM.
+services:
+  tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: issitek-tts
+    ports:
+      - "127.0.0.1:${KOKORO_PORT:-9083}:8880"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8880/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+    restart: unless-stopped
+
+  api:
+    environment:
+      TTS_PROVIDER: kokoro
+      TTS_LOCAL_URL: http://tts:8880
+    depends_on:
+      tts:
+        condition: service_healthy

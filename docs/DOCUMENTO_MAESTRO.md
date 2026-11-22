@@ -740,7 +740,7 @@ CREATE TABLE tts_cache (
 
 Notas:
 - `CITEXT` requiere `CREATE EXTENSION citext`. `pgcrypto`/`gen_random_uuid()` vía `pgcrypto` o pg13+.
-- Retención: `speech_assets.retention_until` + worker diario; borrado físico en el almacenamiento S3 y NULL en referencias.
+- Retención: `speech_assets.retention_until` + worker programado (por defecto cada hora); borrado físico en el almacenamiento S3 y anonimización de la referencia (`purged/{id}`).
 - Menores: `user_profiles.birth_year` + flag parental para consentimiento y límites de sesión.
 - Estadísticas (`/statistics`) se sirven con vistas materializadas sobre
   `learning_events` y `student_progress` (refresco por worker, no en caliente).
@@ -1146,11 +1146,11 @@ Criterios de aceptación por fase: ver `BACKLOG.md`.
 
 - **Consentimiento (dos actos separados):** `recording` (grabar y almacenar la voz en el almacenamiento S3) y `third_party_processing` (enviar audio a un proveedor externo de evaluación). Autorizar uno **no** implica el otro. Sin `recording`, la conversación funciona sin persistir voz (STT solo en memoria).
 - **Evidencia:** cada consentimiento guarda versión del aviso, fecha, método y hash de IP/user-agent en `consents`; revocable en cualquier momento con borrado efectivo.
-- **Retención:** por defecto, borrado de audios de conversación a los **30 días** (`retention_until`); transcripciones se conservan; el alumno puede borrar su historial (soft delete + borrado físico diferido ≤ 30 días).
+- **Retención:** por defecto, borrado de audios de conversación a los **30 días** (`retention_until`) mediante worker programado; transcripciones se conservan; el alumno puede borrar su historial (soft delete + borrado físico diferido ≤ 30 días).
 - **Cifrado:** TLS en tránsito (HTTP/WS), DTLS-SRTP obligatorio en WebRTC, S3 con cifrado en reposo, secretos en `.env`/vault.
 - **Acceso:** URLs de `speech_assets` firmadas y de vida corta (`MINIO_PRESIGN_TTL_S`); verificación `sha256` al completar subida; admin con audit log; nada público.
 - **Separación de audios:** `speech_assets.source` distingue `tts_reference` (material del sistema) de `student_recording` (dato personal); políticas y retención independientes.
-- **Borrado:** `DELETE /recordings/{id}` marca `deleted_at` y un worker elimina el objeto del almacenamiento S3 en ≤ 24 h; la referencia queda anonimizada.
+- **Borrado:** `DELETE /recordings/{id}` marca `deleted_at` y el worker elimina el objeto del almacenamiento S3 en el siguiente ciclo (por defecto ≤ 1 h); la referencia queda anonimizada.
 - **Menores:** si `birth_year` indica < 18, se requiere flujo de consentimiento parental, sesiones más cortas, sin compras in-app directas, y retención reducida.
 - **LFPDPPP (México):** aviso de privacidad, derechos ARCO, responsable y domicilio identificables, antes del piloto abierto.
 

@@ -78,7 +78,8 @@ ALTER TABLE speech_assets
   ADD COLUMN source TEXT NOT NULL DEFAULT 'student_recording',
   ADD COLUMN consent_id UUID REFERENCES consents(id),
   ADD COLUMN mime TEXT,
-  ADD COLUMN deleted_at TIMESTAMPTZ;
+  ADD COLUMN deleted_at TIMESTAMPTZ,
+  ADD COLUMN retention_until TIMESTAMPTZ NOT NULL;
 
 CREATE INDEX idx_speech_assets_user_source
   ON speech_assets (user_id, source, created_at DESC);
@@ -86,6 +87,10 @@ CREATE INDEX idx_speech_assets_user_source
 CREATE INDEX idx_speech_assets_purge
   ON speech_assets (deleted_at)
   WHERE deleted_at IS NOT NULL;
+
+CREATE INDEX idx_speech_assets_retention
+  ON speech_assets (retention_until)
+  WHERE deleted_at IS NULL;
 ```
 
 `source`:
@@ -98,6 +103,8 @@ CREATE INDEX idx_speech_assets_purge
 
 `consent_id` apunta al consentimiento `recording` vigente en el momento de la
 subida. `deleted_at` marca borrado lógico; el worker elimina el objeto físico.
+`retention_until` se fija en `presign` como `now + RECORDING_RETENTION_DAYS` y
+es la fuente de verdad para la purga programada.
 
 ### 3.3 `exercise_attempts`
 
@@ -172,7 +179,8 @@ CREATE TABLE tts_cache (
 );
 ```
 
-- `text_hash = sha256(normalize(text) + "|" + voice_id + "|" + locale)`.
+- `text_hash = sha256(normalize(text) + "|" + voice_id + "|" + locale + "|" + provider)`.
+  Incluir el proveedor evita reutilizar un tono de `fake` al activar Kokoro.
 - El objeto vive en el bucket `reference-audio`; `storage_key` es estable.
 - `hit_count` alimenta la métrica de caché (SLO: hit < 200 ms).
 
@@ -272,7 +280,11 @@ student-recordings/{user_id}/{yyyy}/{mm}/{uuid}.webm
 - `reference-audio`: versionado, sin expiración automática.
 - `student-recordings`: expiración a `RECORDING_RETENTION_DAYS` (30) salvo
   retención legal; el borrado lógico manda sobre la fecha.
-- Objetos huérfanos (sin fila) se reconcilian semanalmente.
+- El worker `issitek-worker` corre cada hora (configurable), elimina el objeto,
+  fija `deleted_at` y anonimiza `storage_key` como `purged/{id}`. Es idempotente
+  y reintenta si el almacenamiento no está disponible.
+- La reconciliación de objetos huérfanos de TTS queda para F4a; la caché se
+  autorrepara cuando detecta que el objeto desapareció.
 
 ## 6. Retención
 
@@ -319,13 +331,13 @@ El progreso académico **solo** se calcula desde `exercise_attempts` y
 
 ## 10. Migraciones (Alembic)
 
-Orden propuesto:
+Orden real:
 
-1. `0001_initial_education` — usuarios, cursos, lecciones, ejercicios, progreso.
-2. `0002_voice_consents` — `consents` + deltas de `speech_assets`.
-3. `0003_pronunciation_deltas` — deltas de `pronunciation_attempts`.
-4. `0004_exercise_attempts_tts_cache` — `exercise_attempts`, `tts_cache`.
-5. `0005_indexes` — índices parciales y de consulta.
+1. `5ebfd9175ba2_initial_education_and_voice` — usuarios, cursos, lecciones,
+   ejercicios, progreso, consentimientos, `speech_assets`, `tts_cache` y
+   `pronunciation_attempts`.
+2. `b7c1e2f3a4d5_retention_until` — `speech_assets.retention_until` + índice
+   parcial; las filas existentes reciben `created_at + 30 días`.
 
 Reglas:
 
@@ -335,12 +347,13 @@ Reglas:
 
 ## 11. Criterios de aceptación
 
-- [ ] `alembic upgrade head` y `downgrade base` limpios en CI.
-- [ ] `consents` permite dos consentimientos independientes y revocación.
-- [ ] Una grabación sin `consent recording` vigente no se persiste.
-- [ ] Un adaptador remoto sin `third_party_processing` devuelve `disabled`.
-- [ ] `DELETE /recordings/{id}` borra el objeto en ≤ 24 h y anonimiza la referencia.
-- [ ] `exercise_attempts.score` nunca contiene puntaje fonético.
-- [ ] `tts_cache` evita una segunda llamada a Kokoro para el mismo texto/voz.
-- [ ] Los audios de referencia y las grabaciones no comparten bucket.
-- [ ] Ningún audio ni texto completo aparece en logs.
+- [x] `alembic upgrade head` y `downgrade base` limpios en CI.
+- [x] `consents` permite dos consentimientos independientes y revocación.
+- [x] Una grabación sin `consent recording` vigente no se persiste.
+- [x] Un adaptador remoto sin `third_party_processing` devuelve `disabled`.
+- [x] `DELETE /recordings/{id}` borra el objeto y anonimiza la referencia; el
+  worker purga además por `retention_until`.
+- [x] `exercise_attempts.score` nunca contiene puntaje fonético.
+- [x] `tts_cache` evita una segunda llamada a Kokoro para el mismo texto/voz.
+- [x] Los audios de referencia y las grabaciones no comparten bucket.
+- [x] Ningún audio ni texto completo aparece en logs.

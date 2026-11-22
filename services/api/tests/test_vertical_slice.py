@@ -91,6 +91,14 @@ def test_vertical_slice_completa(client, auth, first_lesson):
     consents = client.get("/api/v1/consents", headers=headers).json()
     assert any(c["kind"] == "recording" and c["active"] for c in consents)
 
+    too_long = client.post(
+        "/api/v1/recordings/presign",
+        headers=headers,
+        json={"exercise_id": repeat["id"], "duration_ms": 15_001, "mime": "audio/wav"},
+    )
+    assert too_long.status_code == 422
+    assert too_long.json()["error"]["code"] == "recording_too_long"
+
     # TTS de referencia: primero genera, segundo usa caché.
     tts1 = client.get(
         "/api/v1/tts/reference",

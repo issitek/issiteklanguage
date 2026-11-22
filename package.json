@@ -6,6 +6,13 @@
   "scripts": {
     "dev": "pnpm --filter @issitek/web dev",
     "build": "pnpm --filter @issitek/web build",
-    "typecheck": "pnpm --filter @issitek/web typecheck"
+    "typecheck": "pnpm --filter @issitek/shared typecheck && pnpm --filter @issitek/web typecheck",
+    "shared:generate": "pnpm --filter @issitek/shared generate",
+    "check:api": "pnpm shared:generate && git diff --exit-code packages/shared/openapi.json packages/shared/src/openapi.d.ts",
+    "test:e2e": "playwright test -c apps/web/playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "openapi-typescript": "^7.13.0"
   }
 }

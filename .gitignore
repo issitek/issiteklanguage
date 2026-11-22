@@ -6,6 +6,10 @@ __pycache__/
 # Node
 node_modules/
 dist/
+# Playwright
+test-results/
+playwright-report/
+blob-report/
 # Entornos locales (nunca secretos en git)
 infra/.env
 .env
@@ -18,5 +22,7 @@ lab/models/
 # Datos y audios de prueba (regenerables)
 lab/data/
 *.wav
+# Excepción: micrófono sintético de Playwright (fixture versionado)
+!apps/web/e2e/fixtures/*.wav
 # Sistema
 .DS_Store

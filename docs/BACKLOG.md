@@ -91,11 +91,13 @@ evaluación de pronunciación como función de producto. **No bloquea F1–F6.**
 (login → curso A1 → lección → escuchar referencia → grabar → S3 → intento → progreso),
 con evaluación fonética desactivada. La conversación WebRTC se construye en F2.
 
-> **Estado (2026-11-21):** implementados y probados TD-F1-002, 003, 004, 005,
-> 006 (dev), 007, 014, 015, 016 (S3-compatible), 017 (fake/Kokoro
-> configurable), 018 y 019 (vertical slice vía proxy web). Pendientes:
-> TD-F1-001 (worker/`packages/shared`), 013 (OpenAPI snapshot), Kokoro real en
-> Compose, E2E de navegador y proveedor S3 definitivo (R16). Detalle en
+> **Estado (2026-11-21):** implementados y probados TD-F1-001 (monorepo,
+> `packages/shared` y worker; `services/voice` llega en F2), 002, 003, 004, 005,
+> 006 (dev, storage moto), 007, 013 (OpenAPI + tipos sin drift), 014, 015,
+> 016 (S3-compatible), 017 (fake/Kokoro overlay; 10 audios pregenerados), 018,
+> 019 (vertical slice + E2E con micrófono sintético) y 020 (JSON Schema en
+> seed y CI). Pendientes: revisión pedagógica humana del contenido A1, proveedor
+> S3 definitivo (R16) y lint/format en CI. Detalle en
 > [`docs/fase1/plan-fase1.md`](fase1/plan-fase1.md#0-estado-de-ejecución-2026-11-21).
 
 | ID | P | Est. | Dependencias | Tarea | CA |
@@ -105,7 +107,7 @@ con evaluación fonética desactivada. La conversación WebRTC se construye en F
 | TD-F1-003 | P0 | 2d | TD-F1-001 | Backend FastAPI base: estructura de dominios (auth, users, conversation, speech, pronunciation, subscriptions, admin), logging estructurado, request-id, manejo de errores uniforme | `GET /health` OK; errores con `{"error":{code,message,request_id}}` |
 | TD-F1-004 | P0 | 1d | TD-F1-003 | Auth JWT: register/login/refresh/logout; password hashing (argon2/bcrypt); rate limit auth | Flujo completo; access 15 min, refresh 30 d; rate limit en `/auth/login` |
 | TD-F1-005 | P0 | 2d | TD-F1-003 | Esquema SQL (maestro §6) en Alembic: usuarios, suscripciones, perfiles, niveles, cursos/lecciones/ejercicios, vocabulario, grammar_topics, progreso, learning_events, conversation_sessions, conversation_messages, ice_telemetry, speech_assets, avatars, voice_profiles, ai_usage, model_registry | `alembic upgrade head` limpio; seeds mínimos (planes, voces Kokoro) |
-| TD-F1-006 | P0 | 2d | TD-F1-001 | Docker Compose dev all-in-one (nginx, api, worker, postgres, redis, minio, coturn **propio del proyecto**, puertos documentados libres) | `docker compose up` levanta todo; sin colisiones con puertos de proyectos existentes (lista en `infra/README.md`) |
+| TD-F1-006 | P0 | 2d | TD-F1-001 | Docker Compose dev all-in-one (nginx, api, worker, postgres, redis, storage S3 de desarrollo tipo moto; coturn propio se integra en F2), puertos documentados libres | `docker compose up` levanta todo; sin colisiones con puertos de proyectos existentes (lista en `infra/README.md`) |
 | TD-F1-007 | P0 | 2d | TD-F1-006 | Vue 3 + Vite + TS base: routing, layout, tema, auth (login/registro), `pages/home`, store (Pinia) | App corre en dev; login real contra API |
 | TD-F1-013 | P2 | 0.5d | TD-F1-003 | OpenAPI snapshot + `packages/shared` con tipos TS de eventos DataChannel | `pnpm generate` actualiza tipos; CI valida que no hay drift |
 | TD-F1-014 | P0 | 1d | TD-F1-003 | Contrato `PronunciationEvaluator` (Protocol + modelos pydantic versionados) + `FakeEvaluator` (`status=disabled`) + contract tests | Contrato en `docs/fase1/contrato-evaluador.md`; JSON Schema `1.0`; tests cubren los 4 estados |
@@ -114,7 +116,7 @@ con evaluación fonética desactivada. La conversación WebRTC se construye en F
 | TD-F1-017 | P0 | 1d | TD-F1-003 | TTS de referencia: `GET /tts/reference` con caché `tts_cache` (Kokoro) + `GET /tts/voices` | Segundo request idéntico responde < 200 ms desde caché |
 | TD-F1-018 | P0 | 1d | TD-F1-016 | Grabación cliente con `MediaRecorder` (opus/wav): presign → PUT → complete; límites de duración/tamaño y reintentos | Grabación de 15 s sube y se reproduce; reintento tras fallo de red |
 | TD-F1-019 | P0 | 2d | TD-F1-004…018 | **Vertical slice**: login → curso A1 → lección → escuchar palabra (Kokoro) → grabar → S3 → intento registrado → progreso; evaluación fonética desactivada | Recorrido E2E en navegador; `exercise_attempts` y `speech_assets` correctos; UI muestra «Práctica libre» sin puntaje |
-| TD-F1-020 | P1 | 1d | TD-F1-005 | Harness de contenido: JSON Schema de lección + seed de 10 lecciones A1 (borrador) + validación en CI | Seed carga sin errores; lección inválida falla con mensaje claro |
+| TD-F1-020 | P1 | 1d | TD-F1-005 | Harness de contenido: JSON Schema de lección + seed de 10 lecciones A1 (borrador) + validación en seed y CI | Seed carga sin errores; lección inválida falla con mensaje claro |
 
 ---
 

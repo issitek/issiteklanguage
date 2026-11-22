@@ -2,7 +2,7 @@
 
 import hashlib
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
@@ -73,6 +73,7 @@ def presign(
         source="student_recording",
         consent_id=consent.id,
         mime=payload.mime,
+        retention_until=now + timedelta(seconds=settings.recording_retention_seconds),
     )
     db.add(asset)
     db.commit()

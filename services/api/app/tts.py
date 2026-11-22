@@ -37,7 +37,14 @@ def _tone_wav(duration_ms: int = 600, freq: int = 440, rate: int = 24_000) -> by
 def wav_duration_ms(data: bytes) -> int | None:
     try:
         with wave.open(io.BytesIO(data), "rb") as wav:
-            return int(1000 * wav.getnframes() / wav.getframerate())
+            rate = wav.getframerate()
+            channels = wav.getnchannels()
+            width = wav.getsampwidth()
+            # Kokoro devuelve WAV en streaming con nframes=0x7FFFFFFF. El
+            # tamaño real está en los frames disponibles, no en la cabecera.
+            raw = wav.readframes(wav.getnframes())
+            frames = len(raw) // max(1, channels * width)
+            return int(1000 * frames / rate)
     except (wave.Error, EOFError, ZeroDivisionError):
         return None
 
@@ -56,7 +63,9 @@ class TtsService:
             raise AppError(422, "invalid_text", "El texto supera 400 caracteres.")
 
         voice = voice_id or self.settings.tts_default_voice
-        text_hash = hashlib.sha256(f"{normalized}|{voice}|en-US".encode()).hexdigest()
+        text_hash = hashlib.sha256(
+            f"{normalized}|{voice}|en-US|{self.settings.tts_provider}".encode()
+        ).hexdigest()
         bucket = self.settings.minio_bucket_reference
 
         row = self.db.scalars(

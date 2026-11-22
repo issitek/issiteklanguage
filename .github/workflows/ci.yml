@@ -48,6 +48,11 @@ jobs:
       - name: Dependencias
         working-directory: services/api
         run: pip install -r requirements-dev.txt
+      - name: OpenAPI sin drift
+        working-directory: services/api
+        run: |
+          python scripts/export_openapi.py
+          git diff --exit-code ../../packages/shared/openapi.json
       - name: Almacenamiento S3 de desarrollo
         run: |
           nohup moto_server -H 127.0.0.1 -p 9100 >/tmp/moto.log 2>&1 &
@@ -85,5 +90,47 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Tipos
         run: pnpm typecheck
+      - name: OpenAPI TypeScript sin drift
+        run: |
+          pnpm shared:generate
+          git diff --exit-code packages/shared/src/openapi.d.ts
       - name: Build
         run: pnpm build
+
+  e2e:
+    name: E2E navegador (micrófono sintético)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - name: Dependencias
+        run: pnpm install --frozen-lockfile
+      - name: Navegador Playwright
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Levantar stack
+        run: docker compose -f infra/docker-compose.yml up -d --build
+      - name: Esperar API y web
+        run: |
+          for _ in $(seq 1 90); do
+            if curl -fsS http://localhost:8090/health >/dev/null && curl -fsS http://localhost:8090/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f infra/docker-compose.yml logs --tail=200
+          exit 1
+      - name: Playwright
+        run: pnpm test:e2e
+      - name: Logs si falla
+        if: failure()
+        run: docker compose -f infra/docker-compose.yml logs --tail=300
+      - name: Bajar stack
+        if: always()
+        run: docker compose -f infra/docker-compose.yml down -v

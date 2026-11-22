@@ -73,7 +73,7 @@ class ExerciseOut(ORMModel):
     id: uuid.UUID
     type: str
     prompt: str
-    payload: dict
+    payload: dict[str, object]
     position: int
 
 
@@ -91,7 +91,7 @@ class LessonOut(ORMModel):
 
 
 class AttemptIn(BaseModel):
-    response: dict = Field(default_factory=dict)
+    response: dict[str, object] = Field(default_factory=dict)
     hints_used: int = Field(default=0, ge=0, le=20)
     time_ms: int | None = Field(default=None, ge=0)
     recording_id: uuid.UUID | None = None

@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     recording_max_seconds: int = 15
     recording_max_bytes: int = 5_000_000
 
+    # Worker de retención (F1). En producción puede ejecutarse cada hora.
+    worker_interval_seconds: int = 3600
+    worker_run_once: bool = False
+    worker_heartbeat_path: str = "/tmp/issitek-worker-heartbeat"
+    worker_batch_size: int = 500
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

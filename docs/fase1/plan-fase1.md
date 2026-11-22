@@ -20,30 +20,37 @@
 **Hecho y verificado**
 
 - [x] Compose propio (`infra/`): web `8090`, API `8000`, Postgres `5433`,
-  Redis `6380`, almacenamiento S3 de desarrollo `9100`.
-- [x] API FastAPI + SQLAlchemy 2 + Alembic; migración inicial `5ebfd9175ba2`;
-  seed idempotente del curso A1 (**10 lecciones / 30 ejercicios**).
+  Redis `6380`, almacenamiento S3 de desarrollo `9100`, worker de retención.
+- [x] API FastAPI + SQLAlchemy 2 + Alembic; migraciones `5ebfd9175ba2` y
+  `b7c1e2f3a4d5`; seed idempotente del curso A1 (**10 lecciones / 30 ejercicios**).
 - [x] Auth JWT + refresh rotativo + argon2 + límite de intentos de login.
 - [x] Contrato `PronunciationEvaluator` + `FakeEvaluator` + contract tests
-  (`20` pruebas de API en verde).
-- [x] TTS de referencia con caché (fake en dev; Kokoro configurable) y
-  autorreparación si el objeto desaparece.
+  (**38 pruebas de API en verde**).
+- [x] TTS de referencia con caché, autorreparación y clave que incluye el
+  proveedor. Kokoro real verificado en el overlay del Compose; los 10 audios de
+  las lecciones A1 quedaron pregenerados y la segunda pasada fue caché.
+- [x] Worker de retención con `speech_assets.retention_until`, purga idempotente
+  de vencidas/revocadas, anonimización de `storage_key` y healthcheck.
+- [x] Contenido A1 validado por JSON Schema + reglas semánticas (respuestas,
+  duplicados y tipos de ejercicio).
 - [x] Consentimientos separados, `presign → PUT → SHA-256 → complete`, borrado
   y revocación independiente.
 - [x] Vue 3: registro/login, catálogo, lección, reproductor, grabadora y
   progreso; `typecheck` y build de producción en verde.
-- [x] Vertical slice probada de punta a punta por el proxy web (`/api`, `/s3`).
-- [x] CI: migración + pruebas de API; tipos y build del frontend.
+- [x] E2E Playwright del recorrido completo con micrófono sintético, TTS,
+  consentimiento, subida y progreso; en verde localmente.
+- [x] `packages/shared`: snapshot OpenAPI, tipos TS generados y contrato v1 de
+  eventos del DataChannel; CI verifica que no haya drift.
+- [x] CI: migración + pruebas de API; tipos, OpenAPI TS y build del frontend;
+  job E2E con Docker Compose y Chromium.
 
 **Pendiente para cerrar F1**
 
-- [ ] Revisión pedagógica del contenido A1 (el actual es un borrador jugable).
-- [ ] TTS real de Kokoro dentro del Compose (en dev se usa `TTS_PROVIDER=fake`).
-- [ ] `services/worker` (purga programada) y `packages/shared` (tipos
-  compartidos). En F1 la purga es síncrona; el worker entra en F4a.
-- [ ] E2E automatizado en navegador con micrófono sintético.
+- [ ] Revisión pedagógica **humana** del contenido A1 (QA técnica y de formato
+  ya hecha; el texto sigue siendo un borrador jugable).
 - [ ] Decisión del proveedor S3 definitivo (riesgo R16 del maestro).
-- [ ] OpenAPI snapshot y lint/format en CI.
+- [ ] Lint/format en CI (ruff/black/eslint/prettier). Deuda de estilo, no
+  bloquea la vertical slice.
 
 ---
 
@@ -163,7 +170,7 @@ Requisito explícito: **no interferir** con los otros proyectos del VPS.
 | Recurso | Nombre propio |
 |---|---|
 | Proyecto Compose | `COMPOSE_PROJECT_NAME=issitek-language` |
-| Contenedores | `issitek-api`, `issitek-web`, `issitek-postgres`, `issitek-redis`, `issitek-storage` (worker/coturn en fases posteriores) |
+| Contenedores | `issitek-api`, `issitek-web`, `issitek-postgres`, `issitek-redis`, `issitek-storage`, `issitek-worker`; `issitek-tts` solo con el overlay Kokoro (coturn en fases posteriores) |
 | Red | `issitek_net` |
 | Volúmenes | `issitek_pgdata`, `issitek_redis` |
 | Base de datos | `issitek_language` (usuario `issitek`) |
@@ -223,7 +230,7 @@ Errores: `{"error": {"code", "message", "request_id"}}`. Toda respuesta incluye
 **TTS de referencia (Kokoro):**
 
 1. `GET /tts/reference?text=...&voice_id=...`
-2. Hash `sha256(text + voice_id + locale)`.
+2. Hash `sha256(text + voice_id + locale + provider)`.
 3. Hit → URL firmada del almacenamiento S3 (TTL 300 s) + `duration_ms`.
 4. Miss → Kokoro genera, sube a `reference-audio`, guarda en `tts_cache`.
 5. Pregenerar las palabras/frases de las 10 lecciones A1.
@@ -260,15 +267,18 @@ Errores: `{"error": {"code", "message", "request_id"}}`. Toda respuesta incluye
 - [x] `docker compose -p issitek-language up` levanta todo con healthchecks en verde.
 - [x] Registro, login, refresh y logout funcionan; tokens expiran correctamente.
 - [x] Un alumno ve el curso A1 y abre una lección.
-- [ ] Escucha una palabra de referencia generada por Kokoro (segundo request desde caché). _En dev se usa `TTS_PROVIDER=fake`; el contrato y la caché están verificados._
-- [ ] Graba 15 s, sube al almacenamiento S3 y la grabación se reproduce. _Subida y SHA-256 verificados; falta el límite de 15 s y la reproducción en la UI._
+- [x] Escucha una palabra de referencia generada por Kokoro y el segundo request
+  sale de caché. _Verificado con `docker-compose.kokoro.yml`; los 10 audios de
+  las lecciones quedaron pregenerados._
+- [x] Graba, sube al almacenamiento S3 y la grabación se reproduce en la UI.
+  _E2E con micrófono sintético; el límite de 15 s se aplica en UI y API._
 - [x] El intento queda en `exercise_attempts`; el progreso se refleja en la UI.
 - [x] Los dos consentimientos se registran y revocan por separado.
 - [x] `DELETE /recordings/{id}` elimina el objeto y anonimiza la referencia (204/410 verificados).
 - [x] `PronunciationEvaluator` pasa contract tests; con el flag off no hay puntaje.
 - [x] `alembic upgrade head` y `downgrade base` pasan en CI.
-- [ ] E2E del recorrido completo en verde.
-- [ ] OpenAPI y tipos compartidos sin drift.
+- [x] E2E del recorrido completo en verde.
+- [x] OpenAPI y tipos compartidos sin drift.
 - [x] Ningún secreto en git; `.env.example` completo.
 
 ## 9. Riesgos de F1

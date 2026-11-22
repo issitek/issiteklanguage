@@ -176,6 +176,11 @@ class SpeechAsset(Base):
             "deleted_at",
             postgresql_where=text("deleted_at IS NOT NULL"),
         ),
+        Index(
+            "idx_speech_assets_retention",
+            "retention_until",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -196,6 +201,7 @@ class SpeechAsset(Base):
     )
     mime: Mapped[str] = mapped_column(String(120), default="audio/webm", nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retention_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 

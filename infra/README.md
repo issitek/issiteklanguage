@@ -12,6 +12,7 @@ volúmenes, nombres de contenedor ni secretos con otros proyectos del VPS.
 | Postgres | **5433** | usuario/DB `issitek` / `issitek_language` |
 | Redis | **6380** | reservado para F2/F4a |
 | Almacenamiento S3 | **9100** | moto en desarrollo |
+| Kokoro (opcional) | **9083** | solo con `docker-compose.kokoro.yml` |
 
 `80` y `443` quedan libres para el proxy del host.
 
@@ -54,12 +55,37 @@ Abrir `http://localhost:8090`, crear una cuenta y recorrer la lección 1.
 El `entrypoint` de la API ejecuta `alembic upgrade head` y el seed idempotente
 del curso A1 (10 lecciones) antes de arrancar Uvicorn.
 
+`issitek-worker` reutiliza el paquete de la API (`python -m app.worker`) para
+purgar grabaciones vencidas o revocadas, eliminar el objeto de S3 y anonimizar
+la referencia. Por defecto corre cada hora (`WORKER_INTERVAL_SECONDS=3600`) y
+publica un heartbeat para su healthcheck. Detalle en
+[`services/worker/README.md`](../services/worker/README.md).
+
+nginx resuelve `api` y `storage` con el DNS interno de Docker en cada petición,
+así que recrear solo un contenedor no deja respuestas 502 por una IP vieja.
+
 ## TTS
 
 - `TTS_PROVIDER=fake` (por defecto): genera un tono corto para que la vertical
   slice funcione sin Kokoro. **No es audio pedagógico.**
-- `TTS_PROVIDER=kokoro`: usa el servicio Kokoro del laboratorio
-  (`http://host.docker.internal:9082`, endpoint `/v1/audio/speech`).
+- `TTS_PROVIDER=kokoro`: usa Kokoro por el endpoint `/v1/audio/speech`.
+  Para levantarlo dentro del proyecto (CPU, descarga el modelo la primera vez):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.kokoro.yml up -d --build
+```
+
+La API queda en `TTS_LOCAL_URL=http://tts:8880` y el contenedor publica
+`127.0.0.1:9083` solo para depuración (`KOKORO_PORT`). Para pregenerar el audio
+de las 10 lecciones:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.kokoro.yml exec api \
+  python scripts/pregenerate_tts.py
+```
+
+- El laboratorio puede seguir usando su propio Kokoro en `9082`; no se comparte
+  con el Compose del producto.
 
 ## Pruebas
 
@@ -86,6 +112,33 @@ docker run --rm --network issitek_net \
   -e MINIO_ENDPOINT=storage:9000 \
   -e MINIO_ACCESS_KEY=issitek -e MINIO_SECRET_KEY=issitek-secret \
   issitek-api:test pytest -q
+```
+
+## Contrato compartido, frontend y E2E
+
+```bash
+pnpm install
+pnpm typecheck                  # @issitek/shared + @issitek/web
+pnpm shared:generate            # openapi.d.ts desde packages/shared/openapi.json
+pnpm build
+```
+
+Para actualizar el snapshot OpenAPI después de cambiar la API:
+
+```bash
+cd services/api
+. .venv/bin/activate
+python scripts/export_openapi.py
+cd ../..
+pnpm shared:generate
+```
+
+El E2E usa Chromium con micrófono sintético (`apps/web/e2e/fixtures/hello.wav`)
+y requiere el stack arriba en `http://localhost:8090`:
+
+```bash
+pnpm exec playwright install chromium
+pnpm test:e2e
 ```
 
 ## Datos y limpieza

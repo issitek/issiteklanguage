@@ -61,6 +61,7 @@ services:
       TTS_PROVIDER: ${TTS_PROVIDER:-fake}
       TTS_LOCAL_URL: ${TTS_LOCAL_URL:-http://host.docker.internal:9082}
       PRONUNCIATION_EVAL_ENABLED: ${PRONUNCIATION_EVAL_ENABLED:-false}
+      RECORDING_RETENTION_DAYS: ${RECORDING_RETENTION_DAYS:-30}
       UVICORN_RELOAD: ${UVICORN_RELOAD:-false}
     ports:
       - "${API_PORT:-8000}:8000"
@@ -72,17 +73,55 @@ services:
       postgres:
         condition: service_healthy
       storage:
-        condition: service_started
+        condition: service_healthy
 
   web:
     build:
-      context: ../apps/web
+      context: ..
+      dockerfile: apps/web/Dockerfile
     container_name: issitek-web
     ports:
       - "${WEB_PORT:-8090}:80"
     depends_on:
       - api
       - storage
+
+  worker:
+    build:
+      context: ../services/api
+    container_name: issitek-worker
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-issitek}:${POSTGRES_PASSWORD:-issitek}@postgres:5432/${POSTGRES_DB:-issitek_language}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-storage:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-issitek}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-issitek-secret}
+      RECORDING_RETENTION_DAYS: ${RECORDING_RETENTION_DAYS:-30}
+      WORKER_INTERVAL_SECONDS: ${WORKER_INTERVAL_SECONDS:-3600}
+      WORKER_RUN_ONCE: ${WORKER_RUN_ONCE:-false}
+    command: ["python", "-m", "app.worker"]
+    volumes:
+      - ../services/api:/app
+    depends_on:
+      api:
+        condition: service_healthy
+      storage:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import os,time; p=os.environ.get('WORKER_HEARTBEAT_PATH','/tmp/issitek-worker-heartbeat'); assert time.time()-os.path.getmtime(p) < 120",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   issitek_pgdata:

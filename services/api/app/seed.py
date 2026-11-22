@@ -1,14 +1,13 @@
 """Seed idempotente del curso A1 (10 lecciones en borrador)."""
 
 import json
-from pathlib import Path
 
 from sqlalchemy import select
 
+from .content import CONTENT_DIR, validate_lesson
 from .db import SessionLocal
 from .models import Course, Exercise, Lesson
 
-CONTENT_DIR = Path(__file__).resolve().parent.parent / "content" / "a1"
 COURSE_SLUG = "a1-english"
 
 
@@ -29,6 +28,7 @@ def seed_content() -> int:
         files = sorted(CONTENT_DIR.glob("*.json"))
         for lesson_pos, path in enumerate(files):
             data = json.loads(path.read_text(encoding="utf-8"))
+            validate_lesson(data, path.name)
             lesson = db.scalars(
                 select(Lesson).where(
                     Lesson.course_id == course.id, Lesson.slug == data["slug"]

@@ -1,0 +1,23 @@
+# Contexto del build web (raíz del repo). La API, el laboratorio y los datos
+# de voz no hacen falta para compilar el frontend.
+.git
+.github
+docs
+infra
+lab
+public
+services
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/test-results
+**/playwright-report
+**/blob-report
+apps/web/e2e
+apps/web/playwright.config.ts
+.env
+**/.env

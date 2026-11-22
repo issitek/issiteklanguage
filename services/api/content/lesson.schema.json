@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://talkdrill.com/schemas/a1-lesson.json",
+  "title": "Lección A1 de Issitek Language",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["slug", "title", "description", "level", "exercises"],
+  "properties": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "minLength": 2,
+      "maxLength": 80
+    },
+    "title": {"type": "string", "minLength": 1, "maxLength": 120},
+    "description": {"type": "string", "minLength": 1, "maxLength": 500},
+    "level": {"const": "A1"},
+    "exercises": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 10,
+      "items": {"$ref": "#/$defs/exercise"}
+    }
+  },
+  "$defs": {
+    "exercise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "prompt", "payload"],
+      "properties": {
+        "type": {
+          "enum": ["listen_repeat", "multiple_choice", "translate"]
+        },
+        "prompt": {"type": "string", "minLength": 1, "maxLength": 300},
+        "payload": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"type": {"const": "listen_repeat"}},
+            "required": ["type"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/listenRepeat"}}}
+        },
+        {
+          "if": {
+            "properties": {"type": {"const": "multiple_choice"}},
+            "required": ["type"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/multipleChoice"}}}
+        },
+        {
+          "if": {
+            "properties": {"type": {"const": "translate"}},
+            "required": ["type"]
+          },
+          "then": {"properties": {"payload": {"$ref": "#/$defs/translate"}}}
+        }
+      ]
+    },
+    "listenRepeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["word", "translation"],
+      "properties": {
+        "word": {"type": "string", "minLength": 1, "maxLength": 200},
+        "translation": {"type": "string", "minLength": 1, "maxLength": 300},
+        "ipa": {"type": "string", "maxLength": 300},
+        "voice_id": {"type": "string", "maxLength": 80}
+      }
+    },
+    "multipleChoice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["options", "answer"],
+      "properties": {
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {"type": "string", "minLength": 1, "maxLength": 200}
+        },
+        "answer": {"type": "integer", "minimum": 0},
+        "hint": {"type": "string", "maxLength": 300}
+      }
+    },
+    "translate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["answers"],
+      "properties": {
+        "answers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {"type": "string", "minLength": 1, "maxLength": 300}
+        },
+        "hint": {"type": "string", "maxLength": 300}
+      }
+    }
+  }
+}
