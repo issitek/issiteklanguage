@@ -2,7 +2,7 @@
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>talkdrill — evaluación de palabras</title>
-<link rel="stylesheet" href="/juez/style.css?v=6">
+<link rel="stylesheet" href="/juez/style.css?v=7">
 </head><body>
 
 <!-- ===== Pantalla 1: bienvenida ===== -->
@@ -19,6 +19,7 @@
       <p class="small">Sé estricto: si el fonema no es reconocible, es <strong>mal</strong>. Si el modelo marcó algo y usted oye bien, es <strong>ok</strong>.
         Su criterio es la verdad para esta evaluación.</p>
     </div>
+    <p class="small" id="blindNotice" hidden><strong>Evaluación ciega:</strong> no verás el puntaje del modelo ni los veredictos de los otros jueces. Escucha el audio y marca tu criterio.</p>
     <p class="small">Progreso guardado en el servidor: puedes continuar desde otro dispositivo con el mismo usuario. Asegúrate de no saltar pasos ni juzgar de memoria.</p>
     <button class="btn primary" id="btnStart" style="width:100%; font-size:1.1rem; margin-top:.4rem">Empezar evaluación →</button>
   </div>
@@ -43,7 +44,7 @@
       <div>transcrito: <b id="phonesActual"></b></div>
     </div>
     <div class="small" id="confText">confianza: —</div>
-    <div class="progress-wrap"><div class="progress-fill" id="confBar" style="width:0%"></div></div>
+    <div class="progress-wrap" id="confWrap"><div class="progress-fill" id="confBar" style="width:0%"></div></div>
 
     <div class="verdict-row">
       <button class="verdict ok" data-v="ok">✓ ok</button>
@@ -76,5 +77,5 @@
   </div>
 </section>
 
-<script src="/juez/app.js?v=6"></script>
+<script src="/juez/app.js?v=7"></script>
 </body></html>

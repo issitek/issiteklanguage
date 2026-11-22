@@ -7,6 +7,7 @@ const state = {
   verdicts: {},    // key → verdict string
   notes: {},       // key → nota
   judge: null,
+  blind: false,
   seq: 0,          // marca monotónica de guardado (server-side ordering)
 };
 
@@ -141,11 +142,20 @@ async function init() {
     if (r.status === 401) throw new Error('sin autenticación');
     const d = await r.json();
     state.judge = d.judge;
+    state.blind = !!d.blind;
   } catch {
     alert('No se pudo identificar tu sesión. Cierra y vuelve a abrir el enlace.');
     return;
   }
   $('judgeTag').textContent = state.judge ? state.judge.toUpperCase() : 'JUEZ';
+  if (state.blind) {
+    document.body.classList.add('blind');
+    document.title = 'talkdrill — adjudicación ciega';
+    const h1 = document.querySelector('#screen-welcome h1');
+    if (h1) h1.innerHTML = 'talkdrill — adjudicación <span class="judgetag" id="judgeTag">JUEZ3</span>';
+    const bn = $('blindNotice');
+    if (bn) bn.hidden = false;
+  }
   const sheet = await fetch('/juez/sheet.json', {cache: 'no-store'}).then(r => r.json());
   state.rows = sheet.map(r => ({ ...r, key: `${r.file}:${r.word}` }));
 

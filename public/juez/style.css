@@ -48,3 +48,10 @@ h1 { font-size:1.2rem; margin:.2rem 0 .6rem; color:#9db2ff; }
   .row { gap:.4rem; }
   .judgetag { font-size:.7rem; }
 }
+
+
+/* ===== Modo ciego (juez3 / adjudicación) ===== */
+body.blind #fileTag,
+body.blind .phones,
+body.blind #confText,
+body.blind #confWrap { display: none !important; }
