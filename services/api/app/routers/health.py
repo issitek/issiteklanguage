@@ -28,9 +28,9 @@ def ready(response: Response, db: Session = Depends(get_db)) -> dict:
     try:
         settings = get_settings()
         get_storage().bucket_exists(settings.minio_bucket_recordings)
-        checks["minio"] = "ok"
+        checks["storage"] = "ok"
     except Exception:
-        checks["minio"] = "fail"
+        checks["storage"] = "fail"
 
     ok = all(value == "ok" for value in checks.values())
     if not ok:

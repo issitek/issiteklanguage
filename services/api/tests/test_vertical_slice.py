@@ -59,6 +59,12 @@ def _upload_recording(client, headers, exercise_id: str) -> dict:
     return complete.json()
 
 
+def test_health_ready_incluye_storage(client):
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    assert response.json()["checks"] == {"postgres": "ok", "storage": "ok"}
+
+
 def test_vertical_slice_completa(client, auth, first_lesson):
     headers = auth["headers"]
 
