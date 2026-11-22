@@ -1,0 +1,42 @@
+{
+  "slug": "greetings",
+  "title": "Saludos",
+  "description": "Aprende a saludar y despedirte en inglés.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Hello",
+      "payload": {
+        "word": "Hello",
+        "translation": "Hola",
+        "ipa": "həˈloʊ",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Cómo se dice «Buenos días»?",
+      "payload": {
+        "options": [
+          "Good morning",
+          "Good night",
+          "Goodbye"
+        ],
+        "answer": 0,
+        "hint": "«Morning» es la mañana."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: ¿Cómo estás?",
+      "payload": {
+        "answers": [
+          "How are you?",
+          "How are you"
+        ],
+        "hint": "Empieza con «How»."
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "slug": "shopping",
+  "title": "De compras",
+  "description": "Compra lo que necesitas.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: How much is it?",
+      "payload": {
+        "word": "How much is it?",
+        "translation": "¿Cuánto cuesta?",
+        "ipa": "haʊ mʌtʃ ɪz ɪt",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué significa «expensive»?",
+      "payload": {
+        "options": [
+          "Barato",
+          "Caro",
+          "Grande"
+        ],
+        "answer": 1,
+        "hint": "Lo contrario de «cheap»."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Quiero comprar esto",
+      "payload": {
+        "answers": [
+          "I want to buy this",
+          "I'd like to buy this"
+        ],
+        "hint": "«Comprar» = buy."
+      }
+    }
+  ]
+}

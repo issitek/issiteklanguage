@@ -251,7 +251,7 @@ académico del alumno.
 ### ADR-014 — Grabación de ejercicios asíncrona (MediaRecorder), WebRTC solo conversación
 
 La práctica de pronunciación de ejercicios usa `MediaRecorder` + subida firmada a
-MinIO (`POST /recordings/presign` → `PUT` → `POST /recordings/{id}/complete`).
+almacenamiento S3-compatible (`POST /recordings/presign` → `PUT` → `POST /recordings/{id}/complete`).
 WebRTC se reserva **exclusivamente** para la conversación en tiempo real (ADR-001,
 ADR-009). Esto abarata el ejercicio, permite reintentos y desacopla la práctica
 del ciclo de vida de una sesión WebRTC.
@@ -288,7 +288,7 @@ del ciclo de vida de una sesión WebRTC.
                                                  │ explicaciones avanzadas  │  │
                                                  └──────────────────────────┘  │
 
-  Infraestructura: PostgreSQL · Redis · MinIO (audio) · coturn (TURN relay) · Docker Compose
+  Infraestructura: PostgreSQL · Redis · S3-compatible (audio) · coturn (TURN relay) · Docker Compose
 ```
 
 ### 3.1 Clientes
@@ -353,7 +353,7 @@ MediaStreamTrack(audio)  ══ RTP/Opus ════════►   VAD → W
 ### 3.5 Datos e infraestructura
 
 PostgreSQL (sistema de verdad) · Redis (sesiones, enrutado, rate limit, caché,
-repetición espaciada en cola) · MinIO (S3 compatible: audios, modelos VRM,
+repetición espaciada en cola) · S3-compatible (audios, modelos VRM,
 assets) · coturn (TURN/STUN) · Docker Compose (MVP) · Nginx (TLS, proxy).
 
 Separación de servidores:
@@ -740,7 +740,7 @@ CREATE TABLE tts_cache (
 
 Notas:
 - `CITEXT` requiere `CREATE EXTENSION citext`. `pgcrypto`/`gen_random_uuid()` vía `pgcrypto` o pg13+.
-- Retención: `speech_assets.retention_until` + worker diario; borrado físico en MinIO y NULL en referencias.
+- Retención: `speech_assets.retention_until` + worker diario; borrado físico en el almacenamiento S3 y NULL en referencias.
 - Menores: `user_profiles.birth_year` + flag parental para consentimiento y límites de sesión.
 - Estadísticas (`/statistics`) se sirven con vistas materializadas sobre
   `learning_events` y `student_progress` (refresco por worker, no en caliente).
@@ -757,31 +757,32 @@ Notas:
 
 ### 7.1 Desarrollo (Docker Compose all-in-one)
 
-Servicios: `nginx` (TLS, proxy) · `web` (Vue dev/preview) · `api` · `voice`
-· `worker` · `postgres` · `redis` · `minio` · `coturn`.
+Servicios actuales de F1: `web` (build Vue + nginx, proxy `/api` y `/s3`) ·
+`api` · `postgres` · `redis` · `storage` (S3-compatible de desarrollo).
+En fases posteriores se suman `voice`, `worker` y `coturn`.
 
 ```yaml
 # infra/docker-compose.yml (resumen de servicios, no exhaustivo)
 services:
-  nginx:   { image: nginx:1.27, ports: ["80:80","443:443"], volumes: ["./nginx:/etc/nginx:ro"] }
-  web:     { build: ../apps/web, depends_on: [api] }
-  api:     { build: ../services/api, env_file: .env, depends_on: [postgres, redis, minio] }
-  voice:   { build: ../services/voice, env_file: .env, depends_on: [api, redis, coturn],
-             devices: ["/dev/nvidia0"],   # solo en lab P100; desarrollo CPU funciona sin GPU
-             environment: ["NVIDIA_VISIBLE_DEVICES=all"] }
-  worker:  { build: ../services/worker, env_file: .env, depends_on: [postgres, redis, minio] }
+  web:     { build: ../apps/web, ports: ["8090:80"], depends_on: [api, storage] }
+  api:     { build: ../services/api, env_file: .env, depends_on: [postgres, redis, storage] }
   postgres:{ image: postgres:16, volumes: ["pgdata:/var/lib/postgresql/data"] }
   redis:   { image: redis:7 }
-  minio:   { image: minio/minio, command: server /data --console-address ":9001" }
-  coturn:  { image: coturn/coturn:4.6, network_mode: host, command: ["-c","/etc/turnserver.conf"] }
+  storage: { build: ../services/storage-dev }   # moto en desarrollo; producción S3/MinIO/Garage
+  # voice / worker / coturn se añaden en F2/F4a
 ```
 
 - Secretos por `.env` (jamás en git); `.env.example` documenta cada variable.
 - **Proyecto Compose independiente:** `COMPOSE_PROJECT_NAME=issitek-language`.
   Contenedores, red y volúmenes llevan ese prefijo (`issitek-api`,
-  `issitek_net`, `issitek_pgdata`). En desarrollo no se publican `80/443`; nginx
-  escucha en `8080` y MinIO en `9100/9101` para no chocar con otros proyectos.
-  Coturn puede reutilizarse con realm `talkdrill`, sin compartir secretos.
+  `issitek_net`, `issitek_pgdata`). En desarrollo no se publican `80/443`;
+  `web` escucha en `8090` y el almacenamiento S3 en `9100` para no chocar con
+  otros proyectos. Coturn puede reutilizarse con realm `talkdrill`, sin
+  compartir secretos.
+- **URLs firmadas:** la API firma contra el host interno (`storage:9000`) y
+  reescribe al endpoint público (`MINIO_PUBLIC_ENDPOINT`). En desarrollo nginx
+  sirve `/s3` en el mismo origen para evitar CORS; en producción se apunta al
+  endpoint S3 público.
 - Desarrollo funciona en CPU; la P100 se usa vía `--profile gpu` o en el servidor de lab.
 
 ### 7.2 Despliegue MVP
@@ -948,7 +949,7 @@ Speechace, ELSA (condicionado a acceso), GOP local (investigación).
 ## 10. Motor visual (profesor 3D)
 
 - Three.js + **VRM**: expresiones estandarizadas (aa, ih, ou, ee, oh + blink),
-  morphTargets, blendshapes. El modelo VRM se sirve desde MinIO y se cachea en el cliente.
+  morphTargets, blendshapes. El modelo VRM se sirve desde el almacenamiento S3 y se cachea en el cliente.
 - **Lip-sync:** timeline de visemas del TTS (o derivada del texto por un
   heurístico fonema→visema si el TTS no la emite) → pesos aplicados por frame
   al blendshape correspondiente. Objetivo: desfase < 100 ms respecto al audio.
@@ -1080,7 +1081,7 @@ orden y se parte Fase 4 y Fase 5.
    contrato `PronunciationEvaluator` + `FakeEvaluator`, modelo de voz y
    consentimientos, TTS de referencia con caché y **vertical slice**: login →
    curso A1 → lección → escuchar palabra (Kokoro) → grabar (MediaRecorder) →
-   MinIO → intento registrado → progreso visible, con evaluación fonética
+   almacenamiento S3 → intento registrado → progreso visible, con evaluación fonética
    desactivada. Resultado: primera pieza real del producto.
 2. **F4a — Núcleo educativo y práctica** (semanas 3–5): cursos, lecciones,
    ejercicios, reglas de avance, repetición, historial de intentos, progreso,
@@ -1130,18 +1131,26 @@ Criterios de aceptación por fase: ver `BACKLOG.md`.
 | R13 | El contenido (10 lecciones A1) es la ruta crítica real, no el código | Alto (calendario) | Plan de autoría + QA pedagógica en F4a; plantillas de lección; revisión por docente |
 | R14 | Enviar grabaciones de alumnos a proveedores externos sin base legal | Alto (legal) | Consentimiento separado `third_party_processing`; motores externos solo con audio sintético o consentimiento específico; revisar DPA de cada proveedor |
 | R15 | Cambiar de motor fonético obliga a rehacer lecciones | Medio | Puerto/adaptador (ADR-011) + contrato versionado + contract tests desde F1 |
+| R16 | MinIO archivó su edición comunitaria y ya no distribuye imagen/binarios; el proveedor S3 definitivo no está decidido | Medio (infra) | Código usa cliente S3 (`minio-py`) y `MINIO_ENDPOINT`/`MINIO_PUBLIC_ENDPOINT`: en desarrollo moto; antes de producción decidir MinIO autorizado, Garage, SeaweedFS o S3 gestionado y migrar datos |
+
+> **Nota R16 (2026-11):** `dl.min.io` responde 410 y los registros de MinIO
+> devuelven 401. Para no bloquear F1, el Compose de desarrollo usa **moto**
+> (`services/storage-dev`) como emulador S3. moto **no** es apto para
+> producción. La decisión del proveedor definitivo queda abierta y debe
+> resolverse antes del despliegue del piloto; el cambio es de configuración,
+> no de código.
 
 ---
 
 ## 16. Privacidad, voz y menores
 
-- **Consentimiento (dos actos separados):** `recording` (grabar y almacenar la voz en MinIO) y `third_party_processing` (enviar audio a un proveedor externo de evaluación). Autorizar uno **no** implica el otro. Sin `recording`, la conversación funciona sin persistir voz (STT solo en memoria).
+- **Consentimiento (dos actos separados):** `recording` (grabar y almacenar la voz en el almacenamiento S3) y `third_party_processing` (enviar audio a un proveedor externo de evaluación). Autorizar uno **no** implica el otro. Sin `recording`, la conversación funciona sin persistir voz (STT solo en memoria).
 - **Evidencia:** cada consentimiento guarda versión del aviso, fecha, método y hash de IP/user-agent en `consents`; revocable en cualquier momento con borrado efectivo.
 - **Retención:** por defecto, borrado de audios de conversación a los **30 días** (`retention_until`); transcripciones se conservan; el alumno puede borrar su historial (soft delete + borrado físico diferido ≤ 30 días).
-- **Cifrado:** TLS en tránsito (HTTP/WS), DTLS-SRTP obligatorio en WebRTC, MinIO con SSE, secretos en `.env`/vault.
+- **Cifrado:** TLS en tránsito (HTTP/WS), DTLS-SRTP obligatorio en WebRTC, S3 con cifrado en reposo, secretos en `.env`/vault.
 - **Acceso:** URLs de `speech_assets` firmadas y de vida corta (`MINIO_PRESIGN_TTL_S`); verificación `sha256` al completar subida; admin con audit log; nada público.
 - **Separación de audios:** `speech_assets.source` distingue `tts_reference` (material del sistema) de `student_recording` (dato personal); políticas y retención independientes.
-- **Borrado:** `DELETE /recordings/{id}` marca `deleted_at` y un worker elimina el objeto de MinIO en ≤ 24 h; la referencia queda anonimizada.
+- **Borrado:** `DELETE /recordings/{id}` marca `deleted_at` y un worker elimina el objeto del almacenamiento S3 en ≤ 24 h; la referencia queda anonimizada.
 - **Menores:** si `birth_year` indica < 18, se requiere flujo de consentimiento parental, sesiones más cortas, sin compras in-app directas, y retención reducida.
 - **LFPDPPP (México):** aviso de privacidad, derechos ARCO, responsable y domicilio identificables, antes del piloto abierto.
 
@@ -1198,10 +1207,11 @@ APP_BASE_URL=https://talkdrill.local
 JWT_SECRET=change-me
 JWT_ACCESS_TTL_MIN=15
 JWT_REFRESH_TTL_DAYS=30
-# Postgres / Redis / MinIO
+# Postgres / Redis / almacenamiento S3-compatible
 DATABASE_URL=postgresql+psycopg://issitek:issitek@postgres:5432/issitek_language
 REDIS_URL=redis://redis:6379/0
-MINIO_ENDPOINT=minio:9000
+MINIO_ENDPOINT=storage:9000
+MINIO_PUBLIC_ENDPOINT=localhost:8090/s3   # host que ve el navegador
 MINIO_ACCESS_KEY=issitek
 MINIO_SECRET_KEY=change-me
 MINIO_BUCKET=talkdrill-assets

@@ -1,0 +1,43 @@
+{
+  "slug": "introductions",
+  "title": "Presentaciones",
+  "description": "Preséntate y conoce a alguien.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: My name is Ana",
+      "payload": {
+        "word": "My name is Ana",
+        "translation": "Me llamo Ana",
+        "ipa": "maɪ neɪm ɪz ˈɑːnə",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué significa «Nice to meet you»?",
+      "payload": {
+        "options": [
+          "Mucho gusto",
+          "Hasta luego",
+          "Buenas noches"
+        ],
+        "answer": 0,
+        "hint": "Se usa al conocer a alguien."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Me llamo Carlos",
+      "payload": {
+        "answers": [
+          "My name is Carlos",
+          "I am Carlos",
+          "I'm Carlos"
+        ],
+        "hint": "Usa «My name is…»."
+      }
+    }
+  ]
+}

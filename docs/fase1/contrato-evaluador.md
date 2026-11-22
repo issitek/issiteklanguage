@@ -72,7 +72,7 @@ class PronunciationEvaluator(Protocol):
 from pydantic import BaseModel, Field
 
 class AudioRef(BaseModel):
-    storage_key: str = Field(min_length=1)   # objeto en MinIO
+    storage_key: str = Field(min_length=1)   # objeto en almacenamiento S3
     sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     duration_ms: int = Field(gt=0, le=60_000)
     mime: str = "audio/webm;codecs=opus"

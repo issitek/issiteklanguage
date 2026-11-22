@@ -1,0 +1,41 @@
+{
+  "slug": "days-and-time",
+  "title": "Días y hora",
+  "description": "Los días de la semana y cómo decir la hora.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Wednesday",
+      "payload": {
+        "word": "Wednesday",
+        "translation": "Miércoles",
+        "ipa": "ˈwɛnzdeɪ",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué día viene después de «Tuesday»?",
+      "payload": {
+        "options": [
+          "Monday",
+          "Wednesday",
+          "Friday"
+        ],
+        "answer": 1,
+        "hint": "Es el tercer día de la semana."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Hoy es lunes",
+      "payload": {
+        "answers": [
+          "Today is Monday"
+        ],
+        "hint": "«Hoy» = Today."
+      }
+    }
+  ]
+}

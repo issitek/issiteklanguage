@@ -1,0 +1,42 @@
+{
+  "slug": "food-and-drinks",
+  "title": "Comida y bebida",
+  "description": "Pide comida y bebida en inglés.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Water",
+      "payload": {
+        "word": "Water",
+        "translation": "Agua",
+        "ipa": "ˈwɔːtəɹ",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Cómo se dice «café»?",
+      "payload": {
+        "options": [
+          "Tea",
+          "Coffee",
+          "Milk"
+        ],
+        "answer": 1,
+        "hint": "Se parece al español «café»."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Quiero un vaso de agua",
+      "payload": {
+        "answers": [
+          "I want a glass of water",
+          "I'd like a glass of water"
+        ],
+        "hint": "«Quiero» = I want."
+      }
+    }
+  ]
+}

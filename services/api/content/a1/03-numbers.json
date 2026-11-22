@@ -1,0 +1,42 @@
+{
+  "slug": "numbers",
+  "title": "Números",
+  "description": "Los números del uno al diez.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Three",
+      "payload": {
+        "word": "Three",
+        "translation": "Tres",
+        "ipa": "θɹiː",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Cuál es el número «seven»?",
+      "payload": {
+        "options": [
+          "6",
+          "7",
+          "9"
+        ],
+        "answer": 1,
+        "hint": "Está entre six y eight."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Tengo dos hermanos",
+      "payload": {
+        "answers": [
+          "I have two brothers",
+          "I have 2 brothers"
+        ],
+        "hint": "«Tengo» = I have."
+      }
+    }
+  ]
+}

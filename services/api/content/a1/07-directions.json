@@ -1,0 +1,43 @@
+{
+  "slug": "directions",
+  "title": "Direcciones",
+  "description": "Pregunta y da direcciones.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Turn left",
+      "payload": {
+        "word": "Turn left",
+        "translation": "Gira a la izquierda",
+        "ipa": "tɜːɹn lɛft",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué significa «Go straight»?",
+      "payload": {
+        "options": [
+          "Gira a la derecha",
+          "Sigue derecho",
+          "Detente"
+        ],
+        "answer": 1,
+        "hint": "«Straight» es recto."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: ¿Dónde está el baño?",
+      "payload": {
+        "answers": [
+          "Where is the bathroom?",
+          "Where's the bathroom?",
+          "Where is the restroom?"
+        ],
+        "hint": "«Dónde» = Where."
+      }
+    }
+  ]
+}

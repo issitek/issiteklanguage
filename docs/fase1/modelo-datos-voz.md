@@ -201,7 +201,7 @@ Alumno abre lección con práctica de voz
 ### 4.2 Subida de grabación
 
 ```
-Cliente                         API                         MinIO
+Cliente                         API                    S3-compatible
   |  POST /recordings/presign ->  |
   |  <- { id, url, fields, ttl }  |
   |  PUT (bytes) -------------------------------------------->|
@@ -222,7 +222,7 @@ Cliente                         API                         MinIO
 DELETE /recordings/{id}
    -> speech_assets.deleted_at = now()
    -> encola purge en worker
-   -> worker elimina objeto de MinIO (<= 24 h)
+   -> worker elimina objeto del almacenamiento S3 (<= 24 h)
    -> referencia queda anonimizada (sin user_id reversible)
 ```
 
@@ -235,13 +235,20 @@ del usuario.
 GET /tts/reference?text&voice_id
    -> hash
    -> hit: URL firmada (300 s) + duration_ms + hit_count++
-   -> miss: Kokoro -> MinIO reference-audio -> tts_cache
+   -> miss: Kokoro -> almacenamiento S3 (reference-audio) -> tts_cache
 ```
 
 Pregeneración: al publicar una lección se generan sus palabras/frases para que
 el primer alumno no pague la latencia.
 
-## 5. MinIO
+## 5. Almacenamiento S3-compatible
+
+> **Estado (2026-11):** MinIO archivó su edición comunitaria y ya no distribuye
+> imagen/binarios. La implementación usa `minio-py` contra cualquier servicio
+> S3-compatible. En desarrollo se usa **moto** (`services/storage-dev`), que no
+> es apto para producción. El proveedor definitivo (MinIO autorizado, Garage,
+> SeaweedFS o S3 gestionado) está pendiente de decisión; ver riesgo R16 del
+> documento maestro.
 
 ### 5.1 Buckets
 
@@ -286,7 +293,7 @@ aprobado en el aviso de privacidad.
 - Verificación SHA-256 al completar la subida.
 - Acceso administrativo con audit log; un admin no puede descargar audio sin
   motivo registrado.
-- Cifrado en tránsito (TLS) y en reposo (MinIO/volumen cifrado).
+- Cifrado en tránsito (TLS) y en reposo (S3/volumen cifrado).
 - Sin audio ni texto completo en logs; solo IDs y hashes.
 - Respaldos cifrados y con la misma política de retención.
 

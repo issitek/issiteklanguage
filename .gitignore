@@ -6,6 +6,12 @@ __pycache__/
 # Node
 node_modules/
 dist/
+# Entornos locales (nunca secretos en git)
+infra/.env
+.env
+# Python tooling
+.pytest_cache/
+.ruff_cache/
 # Lab
 lab/.env.lab
 lab/models/

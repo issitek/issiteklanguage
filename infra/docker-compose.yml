@@ -1,0 +1,95 @@
+name: issitek-language
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: issitek-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-issitek}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-issitek}
+      POSTGRES_DB: ${POSTGRES_DB:-issitek_language}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - issitek_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-issitek} -d ${POSTGRES_DB:-issitek_language}",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: issitek-redis
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - issitek_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible de desarrollo. MinIO OSS está archivado y ya no se
+  # distribuye; el cliente de la API habla S3, así que en producción se apunta
+  # a MinIO/Garage/SeaweedFS/S3 cambiando MINIO_ENDPOINT.
+  storage:
+    build:
+      context: ../services/storage-dev
+    container_name: issitek-storage
+    ports:
+      - "${MINIO_API_PORT:-9100}:9000"
+
+  api:
+    build:
+      context: ../services/api
+    container_name: issitek-api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-issitek}:${POSTGRES_PASSWORD:-issitek}@postgres:5432/${POSTGRES_DB:-issitek_language}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-storage:9000}
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-localhost:8090/s3}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-issitek}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-issitek-secret}
+      TTS_PROVIDER: ${TTS_PROVIDER:-fake}
+      TTS_LOCAL_URL: ${TTS_LOCAL_URL:-http://host.docker.internal:9082}
+      PRONUNCIATION_EVAL_ENABLED: ${PRONUNCIATION_EVAL_ENABLED:-false}
+      UVICORN_RELOAD: ${UVICORN_RELOAD:-false}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ../services/api:/app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage:
+        condition: service_started
+
+  web:
+    build:
+      context: ../apps/web
+    container_name: issitek-web
+    ports:
+      - "${WEB_PORT:-8090}:80"
+    depends_on:
+      - api
+      - storage
+
+volumes:
+  issitek_pgdata:
+    name: issitek_pgdata
+  issitek_redis:
+    name: issitek_redis
+
+networks:
+  default:
+    name: issitek_net

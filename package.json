@@ -1,0 +1,11 @@
+{
+  "name": "issitek-language",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm --filter @issitek/web dev",
+    "build": "pnpm --filter @issitek/web build",
+    "typecheck": "pnpm --filter @issitek/web typecheck"
+  }
+}

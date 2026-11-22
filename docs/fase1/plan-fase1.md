@@ -15,6 +15,36 @@
 > desactivada (`PRONUNCIATION_EVAL_ENABLED=false`) y no se muestra ningún
 > puntaje.
 
+## 0. Estado de ejecución (2026-11-21)
+
+**Hecho y verificado**
+
+- [x] Compose propio (`infra/`): web `8090`, API `8000`, Postgres `5433`,
+  Redis `6380`, almacenamiento S3 de desarrollo `9100`.
+- [x] API FastAPI + SQLAlchemy 2 + Alembic; migración inicial `5ebfd9175ba2`;
+  seed idempotente del curso A1 (**10 lecciones / 30 ejercicios**).
+- [x] Auth JWT + refresh rotativo + argon2 + límite de intentos de login.
+- [x] Contrato `PronunciationEvaluator` + `FakeEvaluator` + contract tests
+  (`20` pruebas de API en verde).
+- [x] TTS de referencia con caché (fake en dev; Kokoro configurable) y
+  autorreparación si el objeto desaparece.
+- [x] Consentimientos separados, `presign → PUT → SHA-256 → complete`, borrado
+  y revocación independiente.
+- [x] Vue 3: registro/login, catálogo, lección, reproductor, grabadora y
+  progreso; `typecheck` y build de producción en verde.
+- [x] Vertical slice probada de punta a punta por el proxy web (`/api`, `/s3`).
+- [x] CI: migración + pruebas de API; tipos y build del frontend.
+
+**Pendiente para cerrar F1**
+
+- [ ] Revisión pedagógica del contenido A1 (el actual es un borrador jugable).
+- [ ] TTS real de Kokoro dentro del Compose (en dev se usa `TTS_PROVIDER=fake`).
+- [ ] `services/worker` (purga programada) y `packages/shared` (tipos
+  compartidos). En F1 la purga es síncrona; el worker entra en F4a.
+- [ ] E2E automatizado en navegador con micrófono sintético.
+- [ ] Decisión del proveedor S3 definitivo (riesgo R16 del maestro).
+- [ ] OpenAPI snapshot y lint/format en CI.
+
 ---
 
 ## 1. Objetivo
@@ -27,7 +57,7 @@ slice** que un alumno pueda recorrer en el navegador:
 3. Abre una lección.
 4. Escucha una palabra mediante Kokoro (audio de referencia).
 5. Graba su pronunciación con `MediaRecorder`.
-6. El audio se almacena en MinIO con URL firmada y verificación SHA-256.
+6. El audio se almacena en S3-compatible con URL firmada y verificación SHA-256.
 7. Se registra el intento educativo.
 8. El sistema muestra su progreso.
 9. La evaluación fonética permanece desactivada.
@@ -56,7 +86,7 @@ Al cierre de F1 debe existir:
 | Infraestructura | Compose propio, redes/volúmenes/nombres aislados, healthchecks, `.env.example` |
 | Backend | Auth (registro, login, refresh, logout), usuarios, cursos/lecciones (lectura), intentos, progreso |
 | Datos | Alembic + tablas educativas base + `consents`, `exercise_attempts`, `tts_cache` + deltas de voz |
-| Audio | TTS de referencia Kokoro con caché; `MediaRecorder` → presign → MinIO → complete |
+| Audio | TTS de referencia Kokoro con caché; `MediaRecorder` → presign → S3 → complete |
 | Evaluador | Puerto + `FakeEvaluator` (siempre `disabled`), JSON Schema 1.0, contract tests |
 | Frontend | Login, curso A1, lección, reproductor de referencia, grabadora, progreso |
 | Calidad | Tests unitarios/integración, E2E del recorrido, OpenAPI snapshot, lint/format |
@@ -83,7 +113,7 @@ slice se pueda demostrar al final de la semana 2 sin depender de Fase 0b.
 | 3 | Cursos/lecciones (lectura) + seeds borrador | Catálogo A1 + lección | Tests de API |
 | 4 | Contrato evaluador + `FakeEvaluator` + contract tests | Cliente del contrato (sin puntaje) | JSON Schema + contract tests |
 | 5 | Migraciones de voz (`consents`, `exercise_attempts`, `tts_cache`, deltas) | Consentimiento (dos actos) | Tests de migración |
-| 6 | TTS de referencia + `tts_cache` + MinIO | Reproductor de referencia + presign/upload | Tests de audio |
+| 6 | TTS de referencia + `tts_cache` + almacenamiento S3 | Reproductor de referencia + presign/upload | Tests de audio |
 | 7 | Intento educativo + progreso | Grabadora + intento + progreso | Tests de integración |
 | 8 | E2E, hardening, documentación | E2E del recorrido | E2E + revisión |
 
@@ -106,7 +136,7 @@ slice se pueda demostrar al final de la semana 2 sin depender de Fase 0b.
                        |
              +---------+---------+
              |                   |
-          Kokoro              MinIO
+          Kokoro          S3-compatible
            TTS             Grabaciones
              |                   |
              +---------+---------+
@@ -133,22 +163,23 @@ Requisito explícito: **no interferir** con los otros proyectos del VPS.
 | Recurso | Nombre propio |
 |---|---|
 | Proyecto Compose | `COMPOSE_PROJECT_NAME=issitek-language` |
-| Contenedores | `issitek-api`, `issitek-web`, `issitek-worker`, `issitek-postgres`, `issitek-redis`, `issitek-minio`, `issitek-nginx` |
+| Contenedores | `issitek-api`, `issitek-web`, `issitek-postgres`, `issitek-redis`, `issitek-storage` (worker/coturn en fases posteriores) |
 | Red | `issitek_net` |
-| Volúmenes | `issitek_pgdata`, `issitek_redis`, `issitek_minio` |
+| Volúmenes | `issitek_pgdata`, `issitek_redis` |
 | Base de datos | `issitek_language` (usuario `issitek`) |
-| Puertos host (dev) | `8080` (nginx), `9100/9101` (MinIO), `5433` (Postgres), `6380` (Redis) |
+| Puertos host (dev) | `8090` (web/nginx), `8000` (API), `9100` (S3 dev), `5433` (Postgres), `6380` (Redis) |
 | Producción | `server_name talkdrill.com` dedicado; Coturn existente con realm `talkdrill` |
 
 Reglas:
 
-- Ningún servicio publica `80/443` en desarrollo; nginx escucha en `8080` y se
-  pone detrás del proxy existente en producción.
+- Ningún servicio publica `80/443` en desarrollo; el contenedor `web` escucha en
+  `8090` y se pone detrás del proxy existente en producción.
 - Coturn se reutiliza (REST-only HMAC) o se levanta con el proyecto; jamás se
   comparte el secreto entre proyectos.
 - Los secretos viven en `infra/.env` (chmod 600) y `.env.example` documenta
   cada variable. Nunca se suben a git.
-- Healthchecks obligatorios en `postgres`, `redis`, `minio` y `api`.
+- Healthchecks obligatorios en `postgres`, `redis`, `storage` y `api`.
+- El almacenamiento de desarrollo es **moto**, no MinIO: ver riesgo R16.
 
 ## 7. Detalle técnico
 
@@ -193,14 +224,14 @@ Errores: `{"error": {"code", "message", "request_id"}}`. Toda respuesta incluye
 
 1. `GET /tts/reference?text=...&voice_id=...`
 2. Hash `sha256(text + voice_id + locale)`.
-3. Hit → URL firmada de MinIO (TTL 300 s) + `duration_ms`.
+3. Hit → URL firmada del almacenamiento S3 (TTL 300 s) + `duration_ms`.
 4. Miss → Kokoro genera, sube a `reference-audio`, guarda en `tts_cache`.
 5. Pregenerar las palabras/frases de las 10 lecciones A1.
 
 **Grabación del alumno (`MediaRecorder`):**
 
 1. `POST /recordings/presign` (mime, duración estimada, `exercise_id`, consentimiento).
-2. `PUT` directo a MinIO con URL firmada.
+2. `PUT` directo al almacenamiento S3 con URL firmada.
 3. `POST /recordings/{id}/complete` con `sha256` y tamaño.
 4. API verifica hash/tamaño, crea `speech_assets` (`source=student_recording`) y
    el intento.
@@ -226,19 +257,19 @@ Errores: `{"error": {"code", "message", "request_id"}}`. Toda respuesta incluye
 
 ## 8. Criterios de aceptación (DoD de F1)
 
-- [ ] `docker compose -p issitek-language up` levanta todo con healthchecks en verde.
-- [ ] Registro, login, refresh y logout funcionan; tokens expiran correctamente.
-- [ ] Un alumno ve el curso A1 y abre una lección.
-- [ ] Escucha una palabra de referencia generada por Kokoro (segundo request desde caché).
-- [ ] Graba 15 s, sube a MinIO y la grabación se reproduce.
-- [ ] El intento queda en `exercise_attempts`; el progreso se refleja en la UI.
-- [ ] Los dos consentimientos se registran y revocan por separado.
-- [ ] `DELETE /recordings/{id}` elimina el objeto y anonimiza la referencia.
-- [ ] `PronunciationEvaluator` pasa contract tests; con el flag off no hay puntaje.
-- [ ] `alembic upgrade head` y `downgrade base` pasan en CI.
+- [x] `docker compose -p issitek-language up` levanta todo con healthchecks en verde.
+- [x] Registro, login, refresh y logout funcionan; tokens expiran correctamente.
+- [x] Un alumno ve el curso A1 y abre una lección.
+- [ ] Escucha una palabra de referencia generada por Kokoro (segundo request desde caché). _En dev se usa `TTS_PROVIDER=fake`; el contrato y la caché están verificados._
+- [ ] Graba 15 s, sube al almacenamiento S3 y la grabación se reproduce. _Subida y SHA-256 verificados; falta el límite de 15 s y la reproducción en la UI._
+- [x] El intento queda en `exercise_attempts`; el progreso se refleja en la UI.
+- [x] Los dos consentimientos se registran y revocan por separado.
+- [x] `DELETE /recordings/{id}` elimina el objeto y anonimiza la referencia (204/410 verificados).
+- [x] `PronunciationEvaluator` pasa contract tests; con el flag off no hay puntaje.
+- [x] `alembic upgrade head` y `downgrade base` pasan en CI.
 - [ ] E2E del recorrido completo en verde.
 - [ ] OpenAPI y tipos compartidos sin drift.
-- [ ] Ningún secreto en git; `.env.example` completo.
+- [x] Ningún secreto en git; `.env.example` completo.
 
 ## 9. Riesgos de F1
 
@@ -246,7 +277,7 @@ Errores: `{"error": {"code", "message", "request_id"}}`. Toda respuesta incluye
 |---|---|
 | El contenido A1 se vuelve el cuello de botella | Seeds en borrador en F1; contenido definitivo y QA en F4a |
 | `MediaRecorder` con códecs distintos por navegador | Detección de capacidades + fallback WAV; validar en Chrome, Safari y Firefox |
-| CORS/firmas MinIO mal configuradas | Prueba de integración con bucket real en CI local; TTL corto |
+| CORS/firmas S3 mal configuradas | Prueba de integración con bucket real en CI local; TTL corto; `/s3` same-origin en dev |
 | Acoplar la UI al evaluador | La UI consume un estado `disabled` explícito; contract tests |
 | Fuga de datos de voz | Buckets privados, URLs firmadas, consentimiento y retención documentados |
 
@@ -267,7 +298,7 @@ Al cerrar F1 se entrega:
 | TD-F1-001…006 | Monorepo, FastAPI, Compose, DB, auth, Vue base |
 | TD-F1-014 | Contrato del evaluador + `FakeEvaluator` + contract tests |
 | TD-F1-015 | Migraciones de voz y consentimientos |
-| TD-F1-016 | MinIO, URLs firmadas, SHA-256, retención |
+| TD-F1-016 | Almacenamiento S3, URLs firmadas, SHA-256, retención |
 | TD-F1-017 | TTS de referencia con caché |
 | TD-F1-018 | Grabación con `MediaRecorder` |
 | TD-F1-019 | Vertical slice completo |

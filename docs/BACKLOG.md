@@ -88,8 +88,15 @@ evaluación de pronunciación como función de producto. **No bloquea F1–F6.**
 ## Fase 1 — Fundamentos (semanas 1–2)
 
 **Objetivo:** plataforma base funcional y primera **vertical slice** educativa
-(login → curso A1 → lección → escuchar referencia → grabar → MinIO → intento → progreso),
+(login → curso A1 → lección → escuchar referencia → grabar → S3 → intento → progreso),
 con evaluación fonética desactivada. La conversación WebRTC se construye en F2.
+
+> **Estado (2026-11-21):** implementados y probados TD-F1-002, 003, 004, 005,
+> 006 (dev), 007, 014, 015, 016 (S3-compatible), 017 (fake/Kokoro
+> configurable), 018 y 019 (vertical slice vía proxy web). Pendientes:
+> TD-F1-001 (worker/`packages/shared`), 013 (OpenAPI snapshot), Kokoro real en
+> Compose, E2E de navegador y proveedor S3 definitivo (R16). Detalle en
+> [`docs/fase1/plan-fase1.md`](fase1/plan-fase1.md#0-estado-de-ejecución-2026-11-21).
 
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
@@ -103,10 +110,10 @@ con evaluación fonética desactivada. La conversación WebRTC se construye en F
 | TD-F1-013 | P2 | 0.5d | TD-F1-003 | OpenAPI snapshot + `packages/shared` con tipos TS de eventos DataChannel | `pnpm generate` actualiza tipos; CI valida que no hay drift |
 | TD-F1-014 | P0 | 1d | TD-F1-003 | Contrato `PronunciationEvaluator` (Protocol + modelos pydantic versionados) + `FakeEvaluator` (`status=disabled`) + contract tests | Contrato en `docs/fase1/contrato-evaluador.md`; JSON Schema `1.0`; tests cubren los 4 estados |
 | TD-F1-015 | P0 | 1d | TD-F1-005 | Migraciones de voz: `consents`, `exercise_attempts`, `tts_cache` + deltas de `pronunciation_attempts` y `speech_assets` | `alembic upgrade head` limpio; `downgrade` probado |
-| TD-F1-016 | P0 | 1d | TD-F1-006 | MinIO: buckets `reference-audio` y `student-recordings`; presign TTL 300 s; verificación SHA-256; retención | Subida firmada OK; hash verificado; URL vencida → 403 |
+| TD-F1-016 | P0 | 1d | TD-F1-006 | Almacenamiento S3-compatible: buckets `reference-audio` y `student-recordings`; presign TTL 300 s; verificación SHA-256; retención | Subida firmada OK; hash verificado; URL vencida → 403 |
 | TD-F1-017 | P0 | 1d | TD-F1-003 | TTS de referencia: `GET /tts/reference` con caché `tts_cache` (Kokoro) + `GET /tts/voices` | Segundo request idéntico responde < 200 ms desde caché |
 | TD-F1-018 | P0 | 1d | TD-F1-016 | Grabación cliente con `MediaRecorder` (opus/wav): presign → PUT → complete; límites de duración/tamaño y reintentos | Grabación de 15 s sube y se reproduce; reintento tras fallo de red |
-| TD-F1-019 | P0 | 2d | TD-F1-004…018 | **Vertical slice**: login → curso A1 → lección → escuchar palabra (Kokoro) → grabar → MinIO → intento registrado → progreso; evaluación fonética desactivada | Recorrido E2E en navegador; `exercise_attempts` y `speech_assets` correctos; UI muestra «Práctica libre» sin puntaje |
+| TD-F1-019 | P0 | 2d | TD-F1-004…018 | **Vertical slice**: login → curso A1 → lección → escuchar palabra (Kokoro) → grabar → S3 → intento registrado → progreso; evaluación fonética desactivada | Recorrido E2E en navegador; `exercise_attempts` y `speech_assets` correctos; UI muestra «Práctica libre» sin puntaje |
 | TD-F1-020 | P1 | 1d | TD-F1-005 | Harness de contenido: JSON Schema de lección + seed de 10 lecciones A1 (borrador) + validación en CI | Seed carga sin errores; lección inválida falla con mensaje claro |
 
 ---
@@ -146,7 +153,7 @@ con evaluación fonética desactivada. La conversación WebRTC se construye en F
 | ID | P | Est. | Dependencias | Tarea | CA |
 |---|---|---|---|---|---|
 | TD-F3-001 | P0 | 1d | TD-F1-007 | Escena Three.js en `apps/web/src/avatar/`: render VRM, luz, cámara, resize, dispose correcto | 60 fps en laptop media y 30+ fps en Android de gama media; sin fugas al desmontar |
-| TD-F3-002 | P0 | 1d | TD-F3-001 | Cargar VRM desde MinIO/assets con cache (Cache Storage + fallback dev local); 1 profesor v1 (asset licenciado/propio) | Carga < 3 s en 4G (con caché < 500 ms); skeleton mientras carga |
+| TD-F3-002 | P0 | 1d | TD-F3-001 | Cargar VRM desde S3/assets con cache (Cache Storage + fallback dev local); 1 profesor v1 (asset licenciado/propio) | Carga < 3 s en 4G (con caché < 500 ms); skeleton mientras carga |
 | TD-F3-003 | P0 | 2d | TD-F3-002 | Lip-sync: aplicar pesos aa/ih/ou/ee/oh (+sil) desde timeline DataChannel a blendshapes VRM; fallback por análisis del stream remoto | Desfase < 100 ms medido con clicker/visemas log; fallback activa si DataChannel cae |
 | TD-F3-004 | P1 | 1d | TD-F3-003 | Parpadeo automático + mirada (look-at cámara) + respiración idle + movimiento de cabeza al hablar/escuchar | Se ve natural en demo; configurable intensidad |
 | TD-F3-005 | P1 | 1.5d | TD-F3-003 | Expresiones por `emotion` (neutral, encouraging, surprised, confused, approving, playful) + transiciones suaves | Emoción cambia < 200 ms tras `assistant_response`; mezcla sin pops |
@@ -205,7 +212,7 @@ corrección contextual.
 | TD-F5-006 | P0 | 2d | TD-F5-004 | Stripe: igual que Mercado Pago (segundo rail) | Ciclo completo en/test mode; ambos rail activos |
 | TD-F5-007 | P1 | 1d | TD-F5-004 | Página de planes/upgrade + estado de suscripción + consumo restante (barras) | UX clara; sin dark patterns |
 | TD-F5-008 | P1 | 2d | TD-F1-003 | Panel administrativo: usuarios, sesiones (trazabilidad de conversación), métricas (DAU, minutos, costo), corte de usuarios, edición de límites | Admin con rol admin; accesos auditados |
-| TD-F5-009 | P1 | 1d | TD-F1-005 | Retención y consentimiento en producción: worker borra audio vencido; UI de borrado de historial; aviso de privacidad + aceptación | Tras cumplir `retention_until`, audios no existen en MinIO; ARCO request documentado |
+| TD-F5-009 | P1 | 1d | TD-F1-005 | Retención y consentimiento en producción: worker borra audio vencido; UI de borrado de historial; aviso de privacidad + aceptación | Tras cumplir `retention_until`, audios no existen en el almacenamiento S3; ARCO request documentado |
 | TD-F5-010 | P1 | 1d | TD-F5-001, TD-F5-002 | Analítica mínima: activación (primera sesión completada), retención D1/D7/D30, minutos promedio, conversión free→paid | Eventos a BD/warehouse simple; dashboard SQL |
 | TD-F5-011 | P2 | 1d | TD-F5-008 | Rate limiting global + WAF básico (reglas nginx: tamaños, métodos, headers) | Fuzzing básico sin 5xx anómalos |
 
@@ -240,7 +247,7 @@ superó el gate §13.5, con activación gradual por cohorte.
 | TD-F6-006 | P1 | 1.5d | TD-F5-009 | Privacidad legal: aviso de privacidad final (LFPDPPP), flujo parental si hay menores, exportar/borrar datos a solicitud | Aviso publicado; proceso ARCO documentado y probado |
 | TD-F6-007 | P1 | 1d | TD-F6-001 | Optimización de latencia: medir y recortar cada etapa (VAD, STT, LLM, TTS, DataChannel) según telemetría real | Al menos 1 mejora significativa en primer-voz o documentado por qué no |
 | TD-F6-008 | P0 | 1d | TD-F6-001…007 | **Go/no-go de lanzamiento** + plan de lanzamiento controlado (lista cerrada, invitaciones, feature flags, rollback) | Decisión firmada; rollout gradual; rollback probado |
-| TD-F6-009 | P2 | 1d | TD-F6-008 | Runbook de operaciones: arranque/parada, backups (pg_dump diario + MinIO versioning), restore probado, monitoreo y alertas | Restore de backup probado en staging |
+| TD-F6-009 | P2 | 1d | TD-F6-008 | Runbook de operaciones: arranque/parada, backups (pg_dump diario + versioning S3), restore probado, monitoreo y alertas | Restore de backup probado en staging |
 
 ---
 

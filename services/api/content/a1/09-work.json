@@ -1,0 +1,41 @@
+{
+  "slug": "work",
+  "title": "Trabajo",
+  "description": "Vocabulario básico del trabajo.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Meeting",
+      "payload": {
+        "word": "Meeting",
+        "translation": "Reunión",
+        "ipa": "ˈmiːtɪŋ",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Cómo se dice «jefe»?",
+      "payload": {
+        "options": [
+          "Boss",
+          "Worker",
+          "Office"
+        ],
+        "answer": 0,
+        "hint": "Es quien dirige."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Trabajo en una oficina",
+      "payload": {
+        "answers": [
+          "I work in an office"
+        ],
+        "hint": "«Trabajo» = I work."
+      }
+    }
+  ]
+}

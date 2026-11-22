@@ -1,0 +1,42 @@
+{
+  "slug": "family",
+  "title": "La familia",
+  "description": "Habla de tu familia.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: Brother",
+      "payload": {
+        "word": "Brother",
+        "translation": "Hermano",
+        "ipa": "ˈbɹʌðəɹ",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué significa «mother»?",
+      "payload": {
+        "options": [
+          "Madre",
+          "Padre",
+          "Hermana"
+        ],
+        "answer": 0,
+        "hint": "Es la mamá."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Ella es mi hermana",
+      "payload": {
+        "answers": [
+          "She is my sister",
+          "She's my sister"
+        ],
+        "hint": "«Ella» = She."
+      }
+    }
+  ]
+}

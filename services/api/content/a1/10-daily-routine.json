@@ -1,0 +1,41 @@
+{
+  "slug": "daily-routine",
+  "title": "Rutina diaria",
+  "description": "Describe tu día.",
+  "level": "A1",
+  "exercises": [
+    {
+      "type": "listen_repeat",
+      "prompt": "Escucha y repite: I wake up at seven",
+      "payload": {
+        "word": "I wake up at seven",
+        "translation": "Me despierto a las siete",
+        "ipa": "aɪ weɪk ʌp æt ˈsɛvən",
+        "voice_id": "af_heart"
+      }
+    },
+    {
+      "type": "multiple_choice",
+      "prompt": "¿Qué significa «breakfast»?",
+      "payload": {
+        "options": [
+          "Almuerzo",
+          "Desayuno",
+          "Cena"
+        ],
+        "answer": 1,
+        "hint": "Es la primera comida del día."
+      }
+    },
+    {
+      "type": "translate",
+      "prompt": "Traduce: Me cepillo los dientes",
+      "payload": {
+        "answers": [
+          "I brush my teeth"
+        ],
+        "hint": "«Cepillar» = brush."
+      }
+    }
+  ]
+}

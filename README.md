@@ -16,9 +16,47 @@ Web (Vue 3) + Android/iOS (Capacitor) · IA híbrida (Qwen local + API externa)
   (`PRONUNCIATION_EVAL_ENABLED=false`) hasta superar su gate de validación.
 - **Fase 1 en curso:** plataforma base, contrato del evaluador, modelo de voz y
   consentimientos, TTS de referencia y la primera vertical slice funcional.
+  Backend, frontend, migraciones, seed A1 (10 lecciones / 30 ejercicios) y
+  Compose independiente ya están implementados y probados; ver
+  [`docs/fase1/plan-fase1.md`](docs/fase1/plan-fase1.md#0-estado-de-ejecución-2026-11-21).
 
 Regla de producto: mientras el evaluador no esté validado, el alumno puede
 **escuchar, grabar, repetir y autocomparar**, pero **no se le muestra un puntaje**.
+
+## Arranque rápido
+
+```bash
+cd infra
+cp .env.example .env          # cambiar contraseñas y JWT_SECRET
+docker compose up -d --build
+docker compose ps
+```
+
+- Web: <http://localhost:8090>
+- API y OpenAPI: <http://localhost:8000/docs>
+- Almacenamiento S3 de desarrollo: <http://localhost:9100>
+
+El `entrypoint` de la API aplica Alembic y siembra el curso A1 antes de
+arrancar. El TTS de desarrollo es `fake` (tono, no voz pedagógica); Kokoro se
+activa con `TTS_PROVIDER=kokoro`.
+
+> **Almacenamiento:** MinIO archivó su edición comunitaria. El código usa un
+> cliente S3-compatible y el Compose de desarrollo usa **moto**. El proveedor
+> definitivo de producción está pendiente de decisión (riesgo R16).
+
+## Pruebas
+
+```bash
+# API (requiere Postgres 5433 y S3 en 9100, ambos del Compose)
+cd services/api
+uv venv --python 3.12 && uv pip install -r requirements-dev.txt
+DATABASE_URL=postgresql+psycopg://issitek:issitek@localhost:5433/issitek_test \
+MINIO_ENDPOINT=localhost:9100 MINIO_ACCESS_KEY=issitek MINIO_SECRET_KEY=issitek-secret \
+  uv run pytest -q
+
+# Frontend
+pnpm install && pnpm typecheck && pnpm build
+```
 
 ## Documentación
 
@@ -36,11 +74,12 @@ Regla de producto: mientras el evaluador no esté validado, el alumno puede
 ## Estructura
 
 ```
-docs/     Documento maestro, backlog, informes y planes de fase
-lab/      Laboratorio de validación de IA (voz y pronunciación)
-apps/     Vue 3 + Capacitor            (Fase 1+)
-services/ api · voice · worker · tts   (Fase 1+)
-infra/    Docker Compose propio, nginx, coturn (Fase 1+)
+docs/               Documento maestro, backlog, informes y planes de fase
+lab/                Laboratorio de validación de IA (voz y pronunciación; datos fuera de git)
+apps/web/           Vue 3 + Vite + TypeScript (vertical slice de F1)
+services/api/       FastAPI + SQLAlchemy 2 + Alembic + contenido A1
+services/storage-dev/ S3-compatible de desarrollo (moto; ver R16)
+infra/              Docker Compose propio (web, API, Postgres, Redis, S3 dev)
 ```
 
 ## Primer recorrido (vertical slice de Fase 1)
@@ -50,7 +89,7 @@ infra/    Docker Compose propio, nginx, coturn (Fase 1+)
 3. Abre una lección.
 4. Escucha una palabra mediante Kokoro (audio de referencia cacheado).
 5. Graba su pronunciación con `MediaRecorder`.
-6. El audio se almacena en MinIO con URL firmada y verificación SHA-256.
+6. El audio se almacena en S3-compatible con URL firmada y verificación SHA-256.
 7. Se registra el intento educativo (`exercise_attempts`).
 8. El sistema muestra su progreso.
 9. La evaluación fonética permanece desactivada.
